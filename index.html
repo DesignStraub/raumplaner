@@ -458,8 +458,9 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const fmtM = v => v.toFixed(2).replace('.', ',') + ' m';
 const fmtA = v => v.toFixed(1).replace('.', ',') + ' m²';
 const isMobile = () => window.matchMedia('(max-width: 820px)').matches;
-// Sparmodus für Handys/Tablets: weniger Pixel, keine Nachbearbeitung, kleinere Schatten, weniger Geometrie, gedrosselte Bildrate im Leerlauf
-const LITE = window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(max-width: 820px)').matches || new URLSearchParams(location.search).has('lite');
+// Sparmodus nur für Handys (Touch + kleiner Bildschirm): keine Nachbearbeitung, kleinere Schatten, weniger Geometrie,
+// gedrosselte Bildrate im Leerlauf. Tablets und Rechner bekommen volle Qualität. Kantenglättung bleibt überall an.
+const LITE = new URLSearchParams(location.search).has('lite') || (window.matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600);
 const dot2 = (a, b) => a[0] * b[0] + a[1] * b[1];
 const neg2 = a => [-a[0], -a[1]];
 const unit2 = a => { const l = Math.hypot(a[0], a[1]) || 1; return [a[0] / l, a[1] / l]; };
@@ -2431,7 +2432,7 @@ let CAP_MAT, FRAME_MAT, LEAF_MAT, HANDLE_MAT, GLASS_MAT, HL_MAT, PREV_OK, PREV_B
 function init3D() {
   const host = $('#three-host');
   const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true }); // log. Tiefenpuffer gegen Flimmern (z-fighting)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LITE ? 1.5 : 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); // auch am Handy volle Schärfe (mit Kantenglättung)
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = LITE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25; // filmischer Look
