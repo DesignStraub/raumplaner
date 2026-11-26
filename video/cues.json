@@ -1,0 +1,96 @@
+{
+ "trailer": [
+  {
+   "start": 7.0,
+   "window": 4.5,
+   "text": "Jedes Zuhause beginnt mit einer Idee."
+  },
+  {
+   "start": 12.6,
+   "window": 8.0,
+   "text": "Mit dem Raumplaner zeichnest du deinen Grundriss – Raum für Raum, direkt im Browser."
+  },
+  {
+   "start": 21.6,
+   "window": 5.8,
+   "text": "Ein Klick – und aus Linien werden Räume."
+  },
+  {
+   "start": 28.4,
+   "window": 8.6,
+   "text": "Setze Möbel, Türen und Fenster. Drehe und skaliere alles, wie du willst. Wähle Böden, Farben und Texturen."
+  },
+  {
+   "start": 37.9,
+   "window": 8.1,
+   "text": "Stockwerke, Treppen, Dach und Balkon: Plane das ganze Haus."
+  },
+  {
+   "start": 46.8,
+   "window": 7.4,
+   "text": "Im Garten – oder mitten in der Stadt. Bei Tag … und bei Nacht."
+  },
+  {
+   "start": 54.9,
+   "window": 8.1,
+   "text": "Und dann geh einfach hinein. Lauf durch dein Zuhause – noch bevor es gebaut ist."
+  },
+  {
+   "start": 63.9,
+   "window": 6.2,
+   "text": "Am Rechner, am Tablet oder am Handy. Kostenlos und ohne Anmeldung."
+  },
+  {
+   "start": 71.0,
+   "window": 7.6,
+   "text": "Und: Der Raumplaner ist Open Source. Jeder kann mitbauen – neue Möbel, neue Ideen, neue Funktionen. Mach mit!"
+  },
+  {
+   "start": 79.8,
+   "window": 6.0,
+   "text": "Raumplaner. Von OneHumanity Labs. One Planet, One Humanity."
+  }
+ ],
+ "short": [
+  {
+   "start": 0.2,
+   "window": 3.5,
+   "text": "Dein Traumhaus in 3D – kostenlos im Browser."
+  },
+  {
+   "start": 3.9,
+   "window": 5.6,
+   "text": "Zeichne deinen Grundriss, Raum für Raum – sogar am Handy."
+  },
+  {
+   "start": 10.0,
+   "window": 4.3,
+   "text": "Ein Tipp – und alles steht in 3D."
+  },
+  {
+   "start": 14.8,
+   "window": 5.5,
+   "text": "Möbel, Böden, Farben: alles frei wählbar."
+  },
+  {
+   "start": 20.8,
+   "window": 5.0,
+   "text": "Mit Dach und Balkon. Garten oder Stadt, Tag oder Nacht."
+  },
+  {
+   "start": 26.3,
+   "window": 4.4,
+   "text": "Und dann: einfach durchlaufen."
+  },
+  {
+   "start": 31.2,
+   "window": 2.9,
+   "text": "Open Source – jeder kann mitbauen."
+  },
+  {
+   "start": 34.8,
+   "window": 4.5,
+   "text": "Raumplaner. Link in der Beschreibung."
+  }
+ ]
+}

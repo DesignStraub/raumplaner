@@ -28,3 +28,7 @@ Dann http://localhost:8765 öffnen. Es wird nur `index.html` benötigt; [three.j
 ## Mitbauen
 
 Der Raumplaner ist Open Source unter der [MIT-Lizenz](LICENSE). Fehler melden, Ideen einbringen, Möbel ergänzen oder neue Funktionen bauen – wie das geht, steht in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Trailer und Short
+
+Die Videos werden direkt aus der App gerendert, siehe [video/README.md](video/README.md).

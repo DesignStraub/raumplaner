@@ -1,0 +1,40 @@
+1
+00:00:07,000 --> 00:00:11,300
+Jedes Zuhause beginnt mit einer Idee.
+
+2
+00:00:12,600 --> 00:00:20,400
+Mit dem Raumplaner zeichnest du deinen Grundriss – Raum für Raum, direkt im Browser.
+
+3
+00:00:21,600 --> 00:00:27,200
+Ein Klick – und aus Linien werden Räume.
+
+4
+00:00:28,400 --> 00:00:36,800
+Setze Möbel, Türen und Fenster. Drehe und skaliere alles, wie du willst. Wähle Böden, Farben und Texturen.
+
+5
+00:00:37,900 --> 00:00:45,800
+Stockwerke, Treppen, Dach und Balkon: Plane das ganze Haus.
+
+6
+00:00:46,800 --> 00:00:54,000
+Im Garten – oder mitten in der Stadt. Bei Tag … und bei Nacht.
+
+7
+00:00:54,900 --> 00:01:02,800
+Und dann geh einfach hinein. Lauf durch dein Zuhause – noch bevor es gebaut ist.
+
+8
+00:01:03,900 --> 00:01:09,900
+Am Rechner, am Tablet oder am Handy. Kostenlos und ohne Anmeldung.
+
+9
+00:01:11,000 --> 00:01:18,400
+Und: Der Raumplaner ist Open Source. Jeder kann mitbauen – neue Möbel, neue Ideen, neue Funktionen. Mach mit!
+
+10
+00:01:19,800 --> 00:01:25,600
+Raumplaner. Von OneHumanity Labs. One Planet, One Humanity.
+

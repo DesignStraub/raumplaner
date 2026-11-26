@@ -1,0 +1,32 @@
+1
+00:00:00,200 --> 00:00:03,500
+Dein Traumhaus in 3D – kostenlos im Browser.
+
+2
+00:00:03,900 --> 00:00:09,300
+Zeichne deinen Grundriss, Raum für Raum – sogar am Handy.
+
+3
+00:00:10,000 --> 00:00:14,100
+Ein Tipp – und alles steht in 3D.
+
+4
+00:00:14,800 --> 00:00:20,100
+Möbel, Böden, Farben: alles frei wählbar.
+
+5
+00:00:20,800 --> 00:00:25,600
+Mit Dach und Balkon. Garten oder Stadt, Tag oder Nacht.
+
+6
+00:00:26,300 --> 00:00:30,500
+Und dann: einfach durchlaufen.
+
+7
+00:00:31,200 --> 00:00:33,900
+Open Source – jeder kann mitbauen.
+
+8
+00:00:34,800 --> 00:00:39,100
+Raumplaner. Link in der Beschreibung.
+

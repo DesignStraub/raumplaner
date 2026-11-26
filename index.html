@@ -4832,7 +4832,7 @@ initUI();
   sp.addEventListener('pointerdown', skip); window.addEventListener('keydown', function k() { window.removeEventListener('keydown', k); if (body.classList.contains('booting')) skip(); });
   $('main').addEventListener('animationend', e => { if (e.animationName === 'appIn') finish(); });
 })();
-if (new URLSearchParams(location.search).has('debug')) window.__rp = { T3, P, W2S, get state() { return state; }, build3D, roofFrame, walkSurfaces, ceilingAt, updateWalk, stopWalk };
+if (new URLSearchParams(location.search).has('debug')) window.__rp = { T3, P, W2S, get state() { return state; }, set state(v) { state = normalizeState(v); afterStateReplaced(); }, build3D, roofFrame, walkSurfaces, ceilingAt, updateWalk, stopWalk, startWalk, setMode, setWhole, setActiveFloor, flyTo, fitCamera, fitPlan, renderHouse, renderFloorUI, afterStateReplaced, computeWalls, roomsFromTemplate, FURN, uid, requestPlanDraw, renderPlanPanels, setLayer, setFov, applyTimeOfDay };
 requestAnimationFrame(resizePlan);
 requestAnimationFrame(loop);
 </script>

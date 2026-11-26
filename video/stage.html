@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Raumplaner – Trailer-Bühne</title>
+<style>
+:root{--blue:#2997ff;--red:#E0002B;--ink:#f5f5f7;--mute:#a1a1a6;--W:1920px;--H:1080px}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased}
+#world{position:absolute;inset:0;overflow:hidden;background:#000}
+#bg{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 40%,#0f1a2c 0%,#060a12 55%,#000 100%)}
+#stars{position:absolute;inset:0;width:100%;height:100%}
+.layer{position:absolute;inset:0;pointer-events:none}
+/* App-Karte (3D-Szenen randlos, UI-Szenen als schwebendes Fenster) */
+#cardwrap{position:absolute;inset:0;perspective:2400px;perspective-origin:50% 45%}
+#card{position:absolute;left:0;top:0;transform-origin:50% 50%;border-radius:0;overflow:hidden;background:#000;will-change:transform}
+#card.win{box-shadow:0 60px 160px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.08)}
+#card iframe,#phone iframe{border:0;display:block;background:#fff}
+#cursor{position:absolute;left:0;top:0;opacity:0;width:34px;height:34px;pointer-events:none;z-index:5;transform-origin:4px 3px;filter:drop-shadow(0 4px 8px rgba(0,0,0,.35))}
+#ripple{position:absolute;width:60px;height:60px;margin:-30px 0 0 -30px;border-radius:50%;border:3px solid rgba(41,151,255,.9);opacity:0;z-index:4}
+/* Handy */
+#phonewrap{position:absolute;inset:0;perspective:2000px}
+#phone{position:absolute;left:0;top:0;width:390px;height:844px;padding:14px;border-radius:64px;background:linear-gradient(145deg,#2a2c31,#0c0d10);box-shadow:0 0 0 2px #3a3c42 inset,0 50px 120px rgba(0,0,0,.6);transform-origin:50% 50%}
+#phone .scr{position:relative;width:390px;height:844px;border-radius:50px;overflow:hidden;background:#000}
+#phone .island{position:absolute;left:50%;top:12px;width:120px;height:34px;margin-left:-60px;border-radius:20px;background:#000;z-index:3}
+#phone .pcur{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:rgba(255,255,255,.55);box-shadow:0 0 0 2px rgba(0,0,0,.15),0 6px 18px rgba(0,0,0,.25);opacity:0;z-index:4}
+/* Kino */
+.bar{position:absolute;left:0;right:0;height:0;background:#000;z-index:20}
+#bar-t{top:0}#bar-b{bottom:0}
+#vign{background:radial-gradient(130% 100% at 50% 50%,rgba(0,0,0,0) 55%,rgba(0,0,0,.55) 100%);z-index:18}
+#grain{z-index:19;opacity:.07;mix-blend-mode:overlay;width:100%;height:100%}
+#fade{background:#000;opacity:1;z-index:40}
+#flash{background:#fff;opacity:0;z-index:39}
+/* Texte */
+.t{position:absolute;opacity:0;will-change:transform,opacity,filter;z-index:30;text-shadow:0 2px 30px rgba(0,0,0,.35)}
+.center{left:0;right:0;text-align:center}
+.eyebrow{font:600 18px/1 -apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:.42em;text-transform:uppercase;color:rgba(245,245,247,.72)}
+.mega{font:700 150px/1 -apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif;letter-spacing:-.045em}
+.mega span{font-weight:200;color:#c7c7cc}
+.sub{font:400 32px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:rgba(245,245,247,.8);letter-spacing:.01em}
+.cap{left:120px}
+.cap .no{font:600 22px/1 -apple-system,sans-serif;color:var(--blue);letter-spacing:.2em;display:flex;align-items:center;gap:16px}
+.cap .no i{display:block;height:2px;width:70px;background:var(--blue);transform-origin:0 50%}
+.cap .ti{font:700 72px/1.05 -apple-system,"SF Pro Display",sans-serif;letter-spacing:-.035em;margin-top:18px}
+.cap .de{font:400 28px/1.35 -apple-system,sans-serif;color:rgba(245,245,247,.78);margin-top:12px;max-width:900px}
+.chips{display:flex;gap:14px;flex-wrap:wrap;margin-top:22px}
+.chips b{font:500 22px/1 -apple-system,sans-serif;padding:12px 20px;border-radius:999px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+#oh .heart{width:200px;height:auto;filter:drop-shadow(0 0 40px rgba(224,0,43,.6)) drop-shadow(0 0 120px rgba(224,0,43,.3))}
+.applogo{display:inline-flex;align-items:center;gap:26px}
+.applogo svg{width:120px;height:120px;filter:drop-shadow(0 0 40px rgba(41,151,255,.6))}
+.url{font:500 34px/1 -apple-system,sans-serif;color:var(--ink);letter-spacing:.01em}
+.url.gh{font-size:26px;color:var(--mute)}
+.pill{display:inline-flex;align-items:center;gap:12px;font:600 24px/1 -apple-system,sans-serif;padding:14px 26px;border-radius:999px;background:rgba(41,151,255,.16);border:1px solid rgba(41,151,255,.5);color:#cfe6ff}
+/* Open Source */
+#oss{z-index:25;opacity:0}
+#oss canvas{position:absolute;inset:0;width:100%;height:100%}
+#code{position:absolute;font:500 19px/1.6 "SF Mono",Menlo,monospace;color:#c9d1d9;background:rgba(13,17,23,.88);border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:30px 34px;white-space:pre;box-shadow:0 40px 120px rgba(0,0,0,.6);overflow:hidden}
+#code .k{color:#ff7b72}#code .s{color:#a5d6ff}#code .n{color:#79c0ff}#code .c{color:#8b949e}
+#repo{position:absolute;background:rgba(22,27,34,.92);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:28px 32px;box-shadow:0 40px 120px rgba(0,0,0,.6);font-family:-apple-system,sans-serif}
+#repo .rn{font:600 30px/1.2 -apple-system,sans-serif;color:#58a6ff}
+#repo .rn span{color:#c9d1d9;font-weight:400}
+#repo .rd{font-size:20px;color:#8b949e;margin-top:10px;max-width:560px;line-height:1.4}
+#repo .rm{display:flex;gap:22px;margin-top:18px;font-size:18px;color:#8b949e;align-items:center}
+#repo .rm i{display:inline-block;width:14px;height:14px;border-radius:50%;background:#e34c26;margin-right:8px;vertical-align:-1px}
+#repo .pub{font-size:15px;border:1px solid #30363d;border-radius:999px;padding:3px 12px;color:#8b949e;margin-left:12px;vertical-align:4px}
+/* Hochformat */
+body.portrait .mega{font-size:96px}
+body.portrait .sub{font-size:30px}
+body.portrait .cap{left:56px;right:56px}
+body.portrait .cap .ti{font-size:64px}
+body.portrait .cap .de{font-size:28px}
+body.portrait .eyebrow{font-size:16px}
+body.portrait .chips b{font-size:22px}
+</style>
+</head>
+<body>
+<div id="world">
+  <div id="bg"></div>
+  <canvas id="stars"></canvas>
+  <div id="cardwrap"><div id="card"><iframe id="app" title="App"></iframe><div id="ripple"></div><svg id="cursor" viewBox="0 0 34 34"><path d="M4 3 L4 27 L10.5 21 L15 31 L19 29.3 L14.6 19.6 L23.5 19.6 Z" fill="#fff" stroke="#111" stroke-width="1.8" stroke-linejoin="round"/></svg></div></div>
+  <div id="phonewrap"><div id="phone"><div class="scr"><div class="island"></div><iframe id="papp" title="Handy" width="390" height="844"></iframe><div class="pcur"></div></div></div></div>
+  <div id="oss" class="layer"><canvas id="osscv"></canvas><div id="code"></div><div id="repo"><div class="rn">DesignStraub / <span>raumplaner</span><span class="pub">Public</span></div><div class="rd">Grundriss zeichnen und Räume in 3D einrichten – im Browser und auf dem Handy.</div><div class="rm"><span><i></i>HTML</span><span>⚖ MIT-Lizenz</span><span>☆ Open Source</span></div></div></div>
+  <div class="layer" id="texts"></div>
+  <div class="layer" id="vign"></div>
+  <canvas class="layer" id="grain"></canvas>
+  <div class="bar" id="bar-t"></div><div class="bar" id="bar-b"></div>
+  <div class="layer" id="flash"></div>
+  <div class="layer" id="fade"></div>
+</div>
+<script src="director.js"></script>
+</body>
+</html>
