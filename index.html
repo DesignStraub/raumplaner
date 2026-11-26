@@ -167,6 +167,7 @@ canvas#plan{position:absolute;inset:0;width:100%;height:100%;display:block;touch
 .warnbox{background:#fff4e5;border-radius:10px;padding:10px 12px;margin-top:10px;font-size:12.5px}
 .warnbox b{display:block;margin-bottom:4px}
 .warnbox .item{padding:5px 0 !important}
+.warnbox .item .name{white-space:normal}
 .btnrow{display:flex;gap:6px;flex-wrap:wrap}
 .toolgrid.five{grid-template-columns:repeat(3,1fr)}
 #view-3d .statusbar{max-width:calc(100% - 200px)}
@@ -1046,15 +1047,25 @@ function placeOpenings(floor, walls) {
       const list = map.get(c.w.key) || [];
       const pos = fitOnWall(c.w, o, projPos(c.w, o.x, o.y), list);
       if (pos == null) continue;
+      if (openingBottom(o) + o.height > slopeLimit(floor, c.w, pos - o.width / 2, pos + o.width / 2) + 1e-6) { unplaced.push({ o, reason: 'unter der Dachschräge zu niedrig – Kniestock oder Neigung erhöhen' }); ok = null; break; }
       o.x = r3(c.w.a[0] + c.w.u[0] * pos); o.y = r3(c.w.a[1] + c.w.u[1] * pos); o.dir = [...c.w.u];
       list.push({ o, pos }); map.set(c.w.key, list); of.set(o.id, { w: c.w, pos }); ok = true; break;
     }
-    if (!ok) unplaced.push({ o, reason: cands.length ? 'kein Platz an der Wand' : 'keine passende Wand mehr' });
+    if (ok === false) unplaced.push({ o, reason: cands.length ? 'kein Platz an der Wand' : 'keine passende Wand mehr' });
   }
   return { map, of, unplaced };
 }
+// Höchste mögliche Oberkante einer Öffnung zwischen s0 und s1 (Abstand von w.a) – im Dachgeschoss begrenzt die Schräge
+function slopeLimit(floor, w, s0, s1) {
+  const f = roofFrame(); if (!f || f.rf !== floor || f.type === 'flach') return Infinity;
+  const margin = state.wallThickness / 2 * f.tA + 0.05;
+  let m = Infinity;
+  for (let i = 0; i <= 8; i++) { const s = s0 + (s1 - s0) * i / 8; m = Math.min(m, roofUnderAt(f, w.a[0] + w.u[0] * s, w.a[1] + w.u[1] * s) - margin); }
+  return m;
+}
 function openingError(w, o, list) {
-  const H = F().wallHeight;
+  const H = F().wallHeight, lim = slopeLimit(F(), w, o.pos - o.width / 2, o.pos + o.width / 2);
+  if (openingBottom(o) + o.height > lim + 1e-6) return lim - openingBottom(o) >= 0.3 ? `Zu hoch für die Dachschräge – hier sind höchstens ${fmtM(lim - openingBottom(o))} möglich.` : 'Hier ist die Wand unter der Dachschräge zu niedrig.';
   if (!(o.width >= 0.3)) return 'Breite muss mindestens 30 cm sein.';
   if (!(o.height >= 0.3)) return 'Höhe muss mindestens 30 cm sein.';
   if (o.type === 'window' && !(o.sill >= 0)) return 'Brüstungshöhe darf nicht negativ sein.';
@@ -2768,7 +2779,16 @@ function startWalk() {
   if (T3.whole) { T3.whole = false; renderFloorUI(); renderHouse(); }
   W.saved = { pos: T3.camera.position.clone(), target: T3.controls.target.clone() };
   const room = (T3.sel?.kind === 'floor' && rooms().find(r => r.id === T3.sel.roomId)) || rooms()[0];
-  const p = interiorPoint(room.points), base = floorBase(floorIdx());
+  let p = interiorPoint(room.points); const base = floorBase(floorIdx()), rf = roofFrame();
+  if (rf && rf.rf === F() && rf.type !== 'flach') { // im Dachgeschoss: Startpunkt mit der meisten Kopfhöhe
+    const c0 = p, score = (x, z) => Math.min(rf.H, roofUnderAt(rf, x, z)) - 0.02 * Math.hypot(x - c0[0], z - c0[1]);
+    let best = score(p[0], p[1]);
+    let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity; for (const q of room.points) { x0 = Math.min(x0, q[0]); z0 = Math.min(z0, q[1]); x1 = Math.max(x1, q[0]); z1 = Math.max(z1, q[1]); }
+    for (let x = x0 + 0.4; x < x1 - 0.39; x += 0.25) for (let z = z0 + 0.4; z < z1 - 0.39; z += 0.25) {
+      if (!strictlyInside([x, z], room.points)) continue;
+      const h = score(x, z); if (h > best) { best = h; p = [x, z]; }
+    }
+  }
   T3.camera.position.set(p[0], base + (floorIdx() ? 0.001 : 0) + EYE, p[1]);
   Object.assign(W, { yaw: 0, pitch: 0, active: true, look: null, move: null, vy: 0, ground: true, jump: false, floor: floorIdx(), startFloor: floorIdx() });
   W.keys.clear(); document.activeElement?.blur?.();
@@ -3029,7 +3049,7 @@ function deleteOpening(id) {
 }
 function unplacedHTML() {
   if (!T3.unplaced.length) return '';
-  return `<div class="warnbox"><b>Nicht platziert (${T3.unplaced.length})</b>Diese Türen/Fenster haben nach der Grundriss-Änderung keine passende Wand gefunden. Sie erscheinen wieder, sobald dort eine Wand ist.
+  return `<div class="warnbox"><b>Nicht platziert (${T3.unplaced.length})</b>Diese Türen/Fenster passen gerade nicht in ihre Wand. Sie erscheinen wieder, sobald es dort passt.
     <div class="list" style="margin-top:6px">${T3.unplaced.map(u => `<div class="item"><span class="name">${esc(u.o.name)} <span class="meta">– ${esc(u.reason)}</span></span><button class="btn small danger" data-del-open="${u.o.id}">Löschen</button></div>`).join('')}</div></div>`;
 }
 function bindUnplaced(box) { box.querySelectorAll('[data-del-open]').forEach(b => b.addEventListener('click', () => { checkpoint(); F().openings = F().openings.filter(x => x.id !== b.dataset.delOpen); rebuildAfterEdit(); })); }
@@ -3314,12 +3334,21 @@ function renderItemProps(box, s) {
   $('#p-del').addEventListener('click', () => deleteItem(it.id));
 }
 const cm2 = v => Math.round(v * 100);
+// Kopfhöhe am oberen Austritt, falls darüber das Dachgeschoss liegt
+function stairHeadroom(it, up) {
+  const rf = roofFrame(); if (!up || !rf || rf.rf !== up || rf.type === 'flach') return Infinity;
+  const d = FURN[it.type]; let m = Infinity;
+  for (const lz of [-d.d / 2 - 0.5, -d.d / 2, -d.d / 2 + 0.6]) for (const lx of [-d.w / 2, 0, d.w / 2]) { const [x, z] = itemToWorld(it, lx, lz); m = Math.min(m, up.wallHeight, roofUnderAt(rf, x, z)); }
+  return m;
+}
 function stairInfoHTML(it) {
   const i = floorIdx(), up = state.floors[i + 1], st = stairSteps(it, floorRise(i));
   const status = !up ? 'Es gibt noch keine Ebene darüber – lege mit „+ Ebene“ eine an.'
     : holeRoom(it, up) ? `Führt hinauf in „${esc(up.name)}“. Dort ist die Decke geöffnet und mit einem Geländer gesichert.`
     : `Die Treppe muss oben vollständig in einem Raum von „${esc(up.name)}“ liegen, sonst gibt es kein Deckenloch.`;
-  return `<div class="kv"><span>Stufen</span><b>${st.n} × ${cm2(st.h)} cm</b></div><div class="kv"><span>Auftritt</span><b>${cm2(st.tr)} cm</b></div>
+  const head = stairHeadroom(it, up);
+  const warn = head < 2 ? `<p class="hint" style="margin:6px 0 0;color:#c4370b">Oben ist die Dachschräge nur ${fmtM(Math.max(0, head))} hoch – dort stößt man sich den Kopf. Dreh die Treppe so, dass sie zur Hausmitte hin ankommt, oder erhöhe den Kniestock.</p>` : '';
+  return warn + `<div class="kv"><span>Stufen</span><b>${st.n} × ${cm2(st.h)} cm</b></div><div class="kv"><span>Auftritt</span><b>${cm2(st.tr)} cm</b></div>
     <p class="hint" style="margin:6px 0 0">${status} Der Pfeil im Grundriss zeigt nach oben. Im Begehen-Modus kannst du hinauflaufen.</p>`;
 }
 
@@ -3387,7 +3416,7 @@ function setMode(m) {
     syncCutSlider();
     if (!T3.renderer) init3D();
     resize3D(); build3D(); syncTools3d(); renderCatalog(); renderHouse(); renderFloorUI();
-    if (T3.unplaced.length) toast(`${T3.unplaced.length} Tür(en)/Fenster fanden keine passende Wand – siehe Eigenschaften.`, 'error');
+    if (T3.unplaced.length) toast(`${T3.unplaced.length} Tür(en)/Fenster konnten nicht eingebaut werden – siehe Eigenschaften.`, 'error');
   }
 }
 function afterStateReplaced() {
