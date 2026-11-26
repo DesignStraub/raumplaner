@@ -157,12 +157,14 @@ canvas#plan{position:absolute;inset:0;width:100%;height:100%;display:block;touch
   .mobilebar.scroll button{flex:0 0 56px}.mobilebar.scroll button.cta{position:sticky;right:0}
   .statusbar{top:8px;bottom:auto;left:8px;right:8px;font-size:11.5px;max-width:none;text-align:center}
   .zoombox{bottom:calc(86px + env(safe-area-inset-bottom));right:8px}
-  .draftbar{top:auto;bottom:calc(86px + env(safe-area-inset-bottom))}
+  .draftbar{top:auto;bottom:calc(86px + env(safe-area-inset-bottom));flex-wrap:wrap;justify-content:center;width:max-content;max-width:calc(100% - 16px);border-radius:20px}
+  .draftbar .kinds{flex-basis:100%;justify-content:center}
   .walk-overlay{top:auto;bottom:calc(96px + env(safe-area-inset-bottom));font-size:12px;width:calc(100% - 24px)}
   #walk-text{flex:1 1 auto;min-width:0}
   .hide-mobile,#tools2d{display:none}
   #panel-3d{max-height:58vh}
   #toast{bottom:calc(94px + env(safe-area-inset-bottom))}
+  body:has(#draftbar:not([hidden])) #toast{bottom:calc(180px + env(safe-area-inset-bottom))}
 }
 .floorbar{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;gap:2px;background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-radius:12px;padding:4px;box-shadow:var(--shadow);z-index:5;max-width:160px}
 .floorbar .fb-title{font-size:10.5px;font-weight:600;color:var(--muted);padding:3px 10px 2px;text-transform:uppercase;letter-spacing:.04em}
@@ -341,7 +343,7 @@ body.booting>header,body.booting>main{animation:appIn 1.25s cubic-bezier(.2,.8,.
       <div class="floorbar" id="floorbar-plan"></div>
       <div class="draftbar" id="draftbar" hidden>
         <div class="seg kinds" id="line-kinds"></div>
-        <button class="btn small" id="draft-undo">Letzter Punkt zurück</button>
+        <button class="btn small" id="draft-undo">Punkt zurück</button>
         <button class="btn small" id="draft-cancel">Abbrechen</button>
         <button class="btn small primary" id="draft-finish">Raum fertig</button>
       </div>
@@ -730,6 +732,7 @@ function holeShader(m) {
   };
   m.customProgramCacheKey = () => 'hole';
 }
+const holeMat = m => { holeShader(m); return m; };
 function updateHoles() { const hs = cellarHoles(); HOLE_U.uHoleN.value = hs.length; hs.forEach((h, i) => HOLE_U.uHoles.value[i].set(h[0], h[1], h[2], h[3])); }
 const plainMatCache = new Map();
 function plainMat(color, opts = {}) {
@@ -1998,7 +2001,7 @@ function renderFloorUI() {
       const b = document.createElement('button'); b.textContent = (fl.roof ? '⌂ ' : fl.cellar ? '▾ ' : '') + fl.name; b.title = fl.name + (fl.roof ? ' (Dachgeschoss)' : fl.cellar ? ' (Keller, unter der Erde)' : '');
       if (fl.id === f.id && !(in3d && T3.whole)) b.className = 'active';
       if (!in3d && P.layer === 'site') b.className = '';
-      b.addEventListener('click', () => { if (in3d && T3.whole) { T3.whole = false; setActiveFloor(fl.id, true); } else if (!in3d && P.layer === 'site') { setLayer('house'); setActiveFloor(fl.id); } else setActiveFloor(fl.id); });
+      b.addEventListener('click', () => { if (in3d && T3.whole) { T3.whole = false; setActiveFloor(fl.id, true); } else setActiveFloor(fl.id); });
       bar.append(b);
     });
     const add = document.createElement('button'); add.className = 'add'; add.textContent = '+ Ebene'; add.title = 'Neue Ebene oben anlegen (Grundriss wird kopiert)';
@@ -2045,6 +2048,7 @@ function deleteFloor() {
   toast(`„${f.name}“ gelöscht.`);
 }
 function setActiveFloor(id, force) {
+  if (P.layer === 'site') setLayer('house'); // eine Ebene anwählen = zurück zum Hausgrundriss
   if (!force && id === state.activeFloor) return;
   const oldBase = floorBase(floorIdx());
   state.activeFloor = id; P.sel = null; P.draft = []; P.action = null; updateDraftBar();
@@ -2767,7 +2771,7 @@ function buildEnvironment() {
   // Grundstück: Rasen als Vieleck (in der Stadt liegt darunter Pflaster, falls das Grundstück kein Rechteck ist)
   const lawn = new THREE.Mesh(floorGeometry(plot), getMaterial('env', { tex: 'lawn', color: nightCol(ENV_TEX.lawn.color) }));
   lawn.position.y = -0.01; lawn.receiveShadow = true; lawn.raycast = () => {}; T3.env.add(lawn);
-  if (city) flat(pw, pd, plainMat(nightCol('#8f8b84'), { roughness: 1 }), cx, cz, -0.02);
+  if (city) flat(pw, pd, envMat('plotpave|' + night, () => holeMat(new THREE.MeshStandardMaterial({ color: nightCol('#8f8b84'), roughness: 1 }))), cx, cz, -0.02);
   const leafMats = ['#1f3a28', '#24432c', '#2b4a30', '#1b3324', '#30502f'].map(c => plainMat(nightCol(c), { roughness: 1, flatShading: true }));
   const ball = new THREE.IcosahedronGeometry(1, 0), cone = new THREE.ConeGeometry(1, 1, 7), trunk = new THREE.CylinderGeometry(0.12, 0.18, 1, 6);
   // Zugang: eigener Weg oder automatischer Weg vom Haus zur Grundstücksgrenze
@@ -2922,7 +2926,7 @@ function lineMat(kind) {
   return lineMats[kind] || (lineMats[kind] = new THREE.MeshStandardMaterial({ color: LINE_KINDS[kind].color, emissive: LINE_KINDS[kind].color, emissiveIntensity: 0.55, roughness: 0.4, transparent: true, opacity: 0.95, depthTest: false }));
 }
 function buildLines(floor, group, active) {
-  if (!active || !T3.showLines || T3.walk.active || !floor.lines.length) return;
+  if (!active || !T3.showLines || T3.walk.active || T3.whole || !floor.lines.length) return;
   for (const l of floor.lines) {
     const mat = lineMat(l.kind), r = l.kind === 'strom' ? 0.018 : 0.026, parts = [];
     for (let i = 0; i < l.pts.length - 1; i++) {
@@ -2939,9 +2943,9 @@ function buildCity({ px0, px1, pz0, pz1, cx, cz, night, R, lights }) {
   const batch = makeBatch(), env = T3.env;
   // Asphalt als Gelände
   T3.ground.position.y = Y0;
-  T3.ground.material = envMat(`asph|${night}`, () => new THREE.MeshStandardMaterial({ roughness: 0.95, map: envTex(`asphalt|${night}`, 256, 256, (x, w) => {
+  T3.ground.material = envMat(`asph|${night}`, () => holeMat(new THREE.MeshStandardMaterial({ roughness: 0.95, map: envTex(`asphalt|${night}`, 256, 256, (x, w) => {
     const c = night ? '#16181b' : '#34373b'; fill(x, w, c); speckle(x, w, c, 9000, 1.5, 0.25, 41); blotches(x, w, c, 18, 20, 70, 0.08, 43);
-  }, [120, 120]) }));
+  }, [120, 120]) })));
   // Straßenachsen
   const xs = [px0 - SW - RW / 2, px1 + SW + RW / 2], zs = [pz0 - SW - RW / 2, pz1 + SW + RW / 2];
   for (let k = 1; k <= K; k++) { xs.push(xs[0] - k * P, xs[1] + k * P); zs.push(zs[0] - k * P, zs[1] + k * P); }
@@ -4146,7 +4150,7 @@ function initUI() {
   $('#tpl-load').addEventListener('click', () => {
     const f = F();
     if ((f.rooms.length || f.openings.length || f.items.length) && !confirm(`Die Räume, Türen und Möbel von „${f.name}“ werden durch die Vorlage ersetzt. Fortfahren? (Rückgängig ist möglich)`)) return;
-    checkpoint(); f.rooms = roomsFromTemplate(tpl.value); f.openings = []; f.items = []; f.sides = []; f.wallNames = []; f.exterior = null;
+    setLayer('house'); checkpoint(); f.rooms = roomsFromTemplate(tpl.value); f.openings = []; f.items = []; f.sides = []; f.wallNames = []; f.exterior = null;
     P.sel = null; P.draft = []; updateDraftBar();
     afterPlanChange(); fitPlan(); T3.fitted = false; closeSheets();
     toast(`Vorlage „${TEMPLATES[tpl.value].name}“ geladen.`);
@@ -4191,7 +4195,7 @@ function initUI() {
   $('#m-new').addEventListener('click', () => {
     pop.hidden = true;
     if (!confirm('Neues, leeres Projekt beginnen? (Rückgängig ist möglich)')) return;
-    checkpoint(); state = defaultState(); P.sel = null; P.draft = []; T3.sel = null; T3.fitted = false; T3.envKey = '';
+    setLayer('house'); checkpoint(); state = defaultState(); P.sel = null; P.draft = []; T3.sel = null; T3.fitted = false; T3.envKey = '';
     setMode('plan'); afterStateReplaced(); fitPlan(); setPlanTool('rect');
   });
   $('#m-export').addEventListener('click', () => {
@@ -4207,7 +4211,7 @@ function initUI() {
     const f = e.target.files[0]; e.target.value = ''; if (!f) return;
     try {
       const ns = normalizeState(JSON.parse(await f.text()));
-      checkpoint(); state = ns; P.sel = null; T3.sel = null; T3.fitted = false; T3.envKey = '';
+      setLayer('house'); checkpoint(); state = ns; P.sel = null; T3.sel = null; T3.fitted = false; T3.envKey = '';
       afterStateReplaced(); setMode('plan'); fitPlan(); toast(`„${state.name}“ geöffnet.`);
     } catch (err) { toast('Datei konnte nicht geöffnet werden: ' + err.message, 'error'); }
   });
