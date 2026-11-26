@@ -106,6 +106,7 @@ section.group{background:var(--card);border-radius:var(--radius);padding:14px;ma
 .draftbar .kinds button.active{background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.12)}
 .floorbar button.site{border-top:.5px solid var(--sep);border-radius:4px 4px 8px 8px;margin-top:2px;color:#2f6b2a;font-weight:600}
 .floorbar button.site.active{background:#34a853;color:#fff}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.grid3 .field{margin:0}.grid3 label{font-size:11.5px}
 .legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
 .zoombox{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
 .zoombox .btn{width:38px;height:38px;padding:0;font-size:19px;border-radius:0;background:transparent;color:var(--text);font-weight:400}
@@ -865,6 +866,15 @@ const FURN = {
     ['b', 'main', -0.36, 0.55, 0, 0.03, 0.5, 1.4], ['b', 'main', 0.36, 0.55, 0, 0.03, 0.5, 1.4]] },
 };
 // Kategorien für den Katalog
+// Eigene Maße je Stück (sonst Katalogmaß). Treppen: Höhe kommt immer von der Ebene (reicht bis zur nächsten)
+const furnHCache = {};
+function furnHeight(type) {
+  if (furnHCache[type] != null) return furnHCache[type];
+  let h = 0; for (const p of FURN[type].parts) h = Math.max(h, p[0] === 's' ? p[3] + p[5] : p[3] + p[6] / 2);
+  return (furnHCache[type] = h || 1);
+}
+const sizeLimits = type => FURN[type]?.stair ? { w: [0.6, 3], d: [1.5, 8] } : { w: [0.1, 12], d: [0.1, 12], h: [0.05, 4] };
+function itemSize(it) { const f = FURN[it.type]; return { ...f, w: it.w ?? f.w, d: it.d ?? f.d, h: f.stair ? 0 : (it.h ?? furnHeight(it.type)), h0: f.stair ? 0 : furnHeight(it.type) }; }
 const FURN_CATS = [
   ['wohnen', 'Wohnen', ['sofa', 'ecksofa', 'sessel', 'couchtisch', 'tv', 'sideboard', 'regal']],
   ['schlafen', 'Schlafen', ['bett', 'einzelbett', 'kinderbett', 'nachttisch', 'kommode', 'schrank']],
@@ -965,7 +975,10 @@ function normOpening(o) {
 }
 function normItem(it) {
   if (!it || !FURN[it.type] || !isFinite(it.x) || !isFinite(it.y)) return null;
-  return { id: String(it.id || uid()), type: it.type, name: String(it.name ?? FURN[it.type].name), x: +it.x, y: +it.y, rot: +it.rot || 0, color: isHex(it.color) ? it.color : FURN[it.type].color };
+  const out = { id: String(it.id || uid()), type: it.type, name: String(it.name ?? FURN[it.type].name), x: +it.x, y: +it.y, rot: +it.rot || 0, color: isHex(it.color) ? it.color : FURN[it.type].color };
+  const lim = sizeLimits(it.type);
+  for (const k of ['w', 'd', 'h']) if (isFinite(+it[k]) && it[k] !== null && it[k] !== '' && lim[k]) out[k] = clamp(+it[k], lim[k][0], lim[k][1]);
+  return out;
 }
 function normSeg(e, withSpec) {
   if (!e || !isVec2(e.a) || !isVec2(e.b)) return null;
@@ -1369,7 +1382,7 @@ function drawPlan() {
   rooms().forEach((r, i) => { path(r.points); ctx.fillStyle = r.id === P.sel ? '#cfe3fb' : roomColor(i); ctx.fill(); });
   // Möbel
   for (const it of F().items) {
-    const d = FURN[it.type]; if (!d) continue;
+    if (!FURN[it.type]) continue; const d = itemSize(it);
     const c = Math.cos(it.rot), s = Math.sin(it.rot);
     const corner = (lx, lz) => W2S(it.x + lx * c - lz * s, it.y + lx * s + lz * c);
     const pts = [corner(-d.w / 2, -d.d / 2), corner(d.w / 2, -d.d / 2), corner(d.w / 2, d.d / 2), corner(-d.w / 2, d.d / 2)];
@@ -2453,13 +2466,13 @@ const floorRise = idx => state.floors[idx].wallHeight + SLAB;
 // lokale Möbelkoordinaten ↔ Welt (wie im Grundriss: rot dreht im Uhrzeigersinn der Bildschirmansicht)
 function itemToWorld(it, lx, lz) { const c = Math.cos(it.rot), s = Math.sin(it.rot); return [it.x + lx * c - lz * s, it.y + lx * s + lz * c]; }
 function worldToItem(it, x, z) { const c = Math.cos(it.rot), s = Math.sin(it.rot), dx = x - it.x, dz = z - it.y; return [dx * c + dz * s, -dx * s + dz * c]; }
-function stairRect(it, grow = 0) { const d = FURN[it.type], hw = d.w / 2 + grow, hd = d.d / 2 + grow; return [itemToWorld(it, -hw, -hd), itemToWorld(it, hw, -hd), itemToWorld(it, hw, hd), itemToWorld(it, -hw, hd)]; }
-function stairSteps(it, rise) { const d = FURN[it.type], n = Math.max(2, Math.ceil(rise / 0.19)); return { n, h: rise / n, tr: d.d / (n - 1) }; }
+function stairRect(it, grow = 0) { const d = itemSize(it), hw = d.w / 2 + grow, hd = d.d / 2 + grow; return [itemToWorld(it, -hw, -hd), itemToWorld(it, hw, -hd), itemToWorld(it, hw, hd), itemToWorld(it, -hw, hd)]; }
+function stairSteps(it, rise) { const d = itemSize(it), n = Math.max(2, Math.ceil(rise / 0.19)); return { n, h: rise / n, tr: d.d / (n - 1) }; }
 // Liegt das Treppenloch (Treppe auf Ebene idx-1) vollständig in einem Raum der Ebene idx?
 function holeRoom(it, floor) { const rc = stairRect(it); return floor?.rooms.find(r => rc.every(p => strictlyInside(p, r.points))) || null; }
 const mergeOrNull = list => list.length ? mergeGeometries(list) : null;
 function buildStair(it, g, rise) {
-  const d = FURN[it.type], { n, h, tr } = stairSteps(it, rise), W = d.w;
+  const d = itemSize(it), { n, h, tr } = stairSteps(it, rise), W = d.w;
   const wood = furnMat('main', it.color), treads = [], whites = [], rails = [];
   const box = (list, sx, sy, sz, x, y, z, rx = 0) => { const b = new THREE.BoxGeometry(sx, sy, sz); if (rx) b.rotateX(rx); b.translate(x, y, z); list.push(b); };
   for (let i = 1; i < n; i++) {
@@ -2484,7 +2497,7 @@ function buildStair(it, g, rise) {
 }
 // Geländer um das Treppenloch auf der oberen Ebene (die Austrittsseite bleibt offen) – liefert Kollisionsstrecken
 function buildHoleRail(it, parent) {
-  const d = FURN[it.type], hw = d.w / 2, hd = d.d / 2, parts = [], segs = [];
+  const d = itemSize(it), hw = d.w / 2, hd = d.d / 2, parts = [], segs = [];
   const sides = [[[-hw, hd], [-hw, -hd]], [[hw, hd], [hw, -hd]], [[-hw, hd], [hw, hd]]];
   for (const [a, b] of sides) {
     const L = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
@@ -2766,6 +2779,7 @@ function buildItem(it, parent, active, idx = floorIdx()) {
   const d = FURN[it.type]; if (!d) return;
   const g = new THREE.Group(); g.position.set(it.x, 0, it.y); g.rotation.y = -it.rot; g.userData = { kind: 'item', id: it.id };
   if (d.stair) buildStair(it, g, floorRise(idx));
+  const sz = itemSize(it), inner = new THREE.Group(); inner.scale.set(sz.w / d.w, d.stair ? 1 : sz.h / sz.h0, sz.d / d.d); g.add(inner);
   for (const p of d.parts) {
     let geo;
     if (p[0] === 'b') { geo = new THREE.BoxGeometry(p[5], p[6], p[7]); }
@@ -2773,7 +2787,7 @@ function buildItem(it, parent, active, idx = floorIdx()) {
     else { geo = new THREE.IcosahedronGeometry(p[5], 1); }
     const m = new THREE.Mesh(geo, furnMat(p[1], it.color));
     m.position.set(p[2], p[3], p[4]); m.castShadow = p[1] !== 'glass'; m.receiveShadow = true;
-    g.add(m);
+    inner.add(m);
   }
   parent.add(g); if (active) T3.itemGroups.set(it.id, g);
 }
@@ -3863,7 +3877,7 @@ function walkSurfaces(x, z) {
     for (const b of fl.balconies || []) { const [lx, lz] = toLocal(b, x, z); if (Math.abs(lx) <= b.w / 2 && Math.abs(lz) <= b.d / 2) out.push(base + BAL_TOP); }
     for (const it of fl.items) {
       if (!isStair(it)) continue;
-      const d = FURN[it.type], [lx, lz] = worldToItem(it, x, z);
+      const d = itemSize(it), [lx, lz] = worldToItem(it, x, z);
       if (Math.abs(lx) <= d.w / 2 && Math.abs(lz) <= d.d / 2) out.push(base + clamp((d.d / 2 - lz) / d.d, 0, 1) * floorRise(i));
     }
   }
@@ -4351,19 +4365,42 @@ function renderOpeningProps(box, s) {
 }
 function renderItemProps(box, s) {
   const it = itemById(s.id); if (!it) { box.innerHTML = ''; return; }
-  const d = FURN[it.type], deg = Math.round(it.rot * 180 / Math.PI) % 360;
+  const d = itemSize(it), deg = ((Math.round(it.rot * 180 / Math.PI) % 360) + 540) % 360 - 180, lim = sizeLimits(it.type), custom = it.w != null || it.d != null || it.h != null;
+  const num = (k, lbl, v) => `<div class="field"><label for="p-${k}">${lbl}</label><input type="number" id="p-${k}" min="${cm2(lim[k][0])}" max="${cm2(lim[k][1])}" step="1" value="${cm2(v)}"></div>`;
   box.innerHTML = `<h3>${esc(d.name)}</h3>
     <div class="field"><label for="p-name">Name</label><input type="text" id="p-name" value="${esc(it.name)}"></div>
-    <div class="kv"><span>Größe</span><b>${cm2(d.w)} × ${cm2(d.d)} cm</b></div>
+    <div class="field"><label>Maße (cm)</label><div class="grid3">${num('w', 'Breite', d.w)}${num('d', d.stair ? 'Lauflänge' : 'Tiefe', d.d)}${d.stair ? '' : num('h', 'Höhe', d.h)}</div>
+      ${custom ? '<button class="btn small" id="p-size-reset" style="margin-top:4px">Katalogmaß</button>' : ''}</div>
     ${d.stair ? stairInfoHTML(it) : ''}
     <div class="row" style="margin:10px 0"><span class="lbl grow">Farbe</span><input type="color" id="p-color" value="${it.color}"></div>
-    <div class="field"><label>Drehen (aktuell ${deg}°)</label>
-      <div class="btnrow"><button class="btn small" data-rot="-90">↺ 90°</button><button class="btn small" data-rot="-15">↺ 15°</button><button class="btn small" data-rot="15">↻ 15°</button><button class="btn small" data-rot="90">↻ 90°</button></div></div>
+    <div class="field"><div class="valrow"><span class="lbl">Drehung</span><b data-out="rot">${deg}°</b></div><input type="range" id="p-rot" min="-180" max="180" step="1" value="${deg}">
+      <div class="btnrow" style="margin-top:6px"><button class="btn small" data-rot="-90">↺ 90°</button><button class="btn small" data-rot="-15">↺ 15°</button><button class="btn small" data-rot="15">↻ 15°</button><button class="btn small" data-rot="90">↻ 90°</button></div></div>
     <p class="hint" style="margin-top:0">Zum Verschieben das Möbelstück in der Ansicht ziehen. Taste R dreht um 90°.</p>
     <div class="btnrow" style="margin-top:12px"><button class="btn small" id="p-dup">Duplizieren</button><button class="btn small danger" id="p-del">Entfernen</button></div>`;
   bindText($('#p-name'), v => { it.name = v; });
   $('#p-color').addEventListener('change', e => { checkpoint(); it.color = e.target.value; rebuildAfterEdit(); });
   box.querySelectorAll('[data-rot]').forEach(b => b.addEventListener('click', () => rotateItem(it.id, +b.dataset.rot * Math.PI / 180)));
+  for (const k of ['w', 'd', 'h']) {
+    const el = $('#p-' + k); if (!el) continue;
+    el.addEventListener('change', () => {
+      const v = parseFloat(String(el.value).replace(',', '.')) / 100;
+      if (!isFinite(v)) { renderProps(); return; }
+      checkpoint(); it[k] = r3(clamp(v, lim[k][0], lim[k][1])); rebuildAfterEdit();
+      if (d.stair && k === 'd') { const st = stairSteps(it, floorRise(floorIdx())); if (st.tr < 0.22 || st.tr > 0.34) toast(`Die Stufen sind jetzt ${cm2(st.tr)} cm tief – bequem sind etwa 25–30 cm.`); }
+    });
+  }
+  $('#p-stair-fit')?.addEventListener('click', e => { checkpoint(); it.d = clamp(+e.target.dataset.len, 1.5, 8); rebuildAfterEdit(); });
+  $('#p-size-reset')?.addEventListener('click', () => { checkpoint(); delete it.w; delete it.d; delete it.h; rebuildAfterEdit(); });
+  // Drehen live (nur die Gruppe drehen), Neuaufbau erst beim Loslassen – so bleibt der Regler in der Hand
+  const rs = $('#p-rot'); let rotBefore = null;
+  rs.addEventListener('input', () => {
+    if (!rotBefore) rotBefore = snapshot();
+    const v = +rs.value; it.rot = r3((((v * Math.PI / 180) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2));
+    const g = T3.itemGroups.get(it.id); if (g) g.rotation.y = -it.rot;
+    applyHighlight();
+    box.querySelector('[data-out="rot"]').textContent = Math.round(v) + '°';
+  });
+  rs.addEventListener('change', () => { if (rotBefore && rotBefore !== snapshot()) pushUndo(rotBefore); rotBefore = null; scheduleSave(); build3D(); });
   $('#p-dup').addEventListener('click', () => duplicateItem(it.id));
   $('#p-del').addEventListener('click', () => deleteItem(it.id));
 }
@@ -4371,7 +4408,7 @@ const cm2 = v => Math.round(v * 100);
 // Kopfhöhe am oberen Austritt, falls darüber das Dachgeschoss liegt
 function stairHeadroom(it, up) {
   const rf = roofFrame(); if (!up || !rf || rf.rf !== up || rf.type === 'flach') return Infinity;
-  const d = FURN[it.type]; let m = Infinity;
+  const d = itemSize(it); let m = Infinity;
   for (const lz of [-d.d / 2 - 0.5, -d.d / 2, -d.d / 2 + 0.6]) for (const lx of [-d.w / 2, 0, d.w / 2]) { const [x, z] = itemToWorld(it, lx, lz); m = Math.min(m, up.wallHeight, roofUnderAt(rf, x, z)); }
   return m;
 }
@@ -4382,7 +4419,9 @@ function stairInfoHTML(it) {
     : `Die Treppe muss oben vollständig in einem Raum von „${esc(up.name)}“ liegen, sonst gibt es kein Deckenloch.`;
   const head = stairHeadroom(it, up);
   const warn = head < 2 ? `<p class="hint" style="margin:6px 0 0;color:#c4370b">Oben ist die Dachschräge nur ${fmtM(Math.max(0, head))} hoch – dort stößt man sich den Kopf. Dreh die Treppe so, dass sie zur Hausmitte hin ankommt, oder erhöhe den Kniestock.</p>` : '';
-  return warn + `<div class="kv"><span>Stufen</span><b>${st.n} × ${cm2(st.h)} cm</b></div><div class="kv"><span>Auftritt</span><b>${cm2(st.tr)} cm</b></div>
+  const ideal = r3((st.n - 1) * 0.27), off = Math.abs(itemSize(it).d - ideal) > 0.05;
+  return warn + `<div class="kv"><span>Höhe (bis zur nächsten Ebene)</span><b>${fmtM(floorRise(i))}</b></div><div class="kv"><span>Stufen</span><b>${st.n} × ${cm2(st.h)} cm</b></div><div class="kv"><span>Auftritt</span><b>${cm2(st.tr)} cm</b></div>
+    ${off ? `<button class="btn small" id="p-stair-fit" data-len="${ideal}" style="margin-top:6px">Bequeme Länge (${fmtM(ideal)})</button>` : ''}
     <p class="hint" style="margin:6px 0 0">${status} Der Pfeil im Grundriss zeigt nach oben. Im Begehen-Modus kannst du hinauflaufen.</p>`;
 }
 
