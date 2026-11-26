@@ -97,7 +97,7 @@ section.group{background:var(--card);border-radius:var(--radius);padding:14px;ma
 .footer-cta{margin-top:auto;padding:4px 2px 2px}
 .glass{background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}
 .statusbar{position:absolute;left:12px;bottom:12px;background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-radius:980px;padding:6px 14px;font-size:12px;color:#515154;pointer-events:none;max-width:calc(100% - 80px);box-shadow:var(--shadow)}
-.draftbar{position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;gap:6px;background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-radius:980px;padding:6px;box-shadow:var(--shadow);z-index:5}
+.draftbar{position:absolute;top:12px;left:12px;max-width:calc(100% - 172px);flex-wrap:wrap;display:flex;gap:6px;background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-radius:20px;padding:6px;box-shadow:var(--shadow);z-index:5}
 .draftbar[hidden]{display:none}
 .draftbar .kinds{display:flex;gap:2px;background:rgba(118,118,128,.12);border-radius:980px;padding:2px}
 .draftbar .kinds:empty{display:none}
@@ -116,7 +116,7 @@ canvas#plan{position:absolute;inset:0;width:100%;height:100%;display:block;touch
 #three-host{position:absolute;inset:0;touch-action:none}
 #three-host canvas{display:block;touch-action:none}
 .label3d{background:rgba(255,255,255,.78);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);padding:3px 10px;border-radius:980px;font-size:12px;font-weight:600;color:#1d1d1f;white-space:nowrap;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.12)}
-.walk-overlay{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:rgba(29,29,31,.72);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);color:#fff;border-radius:16px;padding:8px 8px 8px 14px;font-size:12.5px;display:flex;gap:12px;align-items:center;z-index:5;max-width:calc(100% - 24px)}
+.walk-overlay{position:absolute;top:12px;left:12px;background:rgba(29,29,31,.72);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);color:#fff;border-radius:16px;padding:8px 8px 8px 14px;font-size:12.5px;display:flex;gap:12px;align-items:center;z-index:5;max-width:calc(100% - 172px)}
 .walk-overlay[hidden]{display:none}
 .walk-overlay .btn{padding:5px 12px;font-size:12.5px;background:rgba(255,255,255,.2);color:#fff}
 .crosshair{position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;pointer-events:none}
@@ -158,9 +158,10 @@ canvas#plan{position:absolute;inset:0;width:100%;height:100%;display:block;touch
   .mobilebar.scroll button{flex:0 0 56px}.mobilebar.scroll button.cta{position:sticky;right:0}
   .statusbar{top:8px;bottom:auto;left:8px;right:8px;font-size:11.5px;max-width:none;text-align:center}
   .zoombox{bottom:calc(86px + env(safe-area-inset-bottom));right:8px}
-  .draftbar{top:auto;bottom:calc(86px + env(safe-area-inset-bottom));flex-wrap:wrap;justify-content:center;width:max-content;max-width:calc(100% - 16px);border-radius:20px}
+  .draftbar{top:auto;left:50%;transform:translateX(-50%);bottom:calc(86px + env(safe-area-inset-bottom));flex-wrap:wrap;justify-content:center;width:max-content;max-width:calc(100% - 16px);border-radius:20px}
+  body:has(#draftbar:not([hidden])) .zoombox{display:none}
   .draftbar .kinds{flex-basis:100%;justify-content:center}
-  .walk-overlay{top:auto;bottom:calc(96px + env(safe-area-inset-bottom));font-size:12px;width:calc(100% - 24px)}
+  .walk-overlay{top:auto;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom));font-size:12px;width:calc(100% - 24px);max-width:none}
   #walk-text{flex:1 1 auto;min-width:0}
   .hide-mobile,#tools2d{display:none}
   #panel-3d{max-height:58vh}
@@ -265,6 +266,7 @@ body.booting>header,body.booting>main{animation:appIn 1.25s cubic-bezier(.2,.8,.
 .cine .floorbar,.cine .statusbar,.cine .mobilebar{opacity:0;transition:opacity .6s}
 .floorbar,.statusbar,.mobilebar{transition:opacity .6s}
 .cine .label3d{opacity:0!important}
+.label3d.lbl-hidden{opacity:0;pointer-events:none}
 .label3d{transition:opacity .5s}
 @media (prefers-reduced-motion: reduce){#splash{display:none}body.booting>header,body.booting>main{animation:none}.view.enter{animation:none}}
 </style>
@@ -456,6 +458,8 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const fmtM = v => v.toFixed(2).replace('.', ',') + ' m';
 const fmtA = v => v.toFixed(1).replace('.', ',') + ' m²';
 const isMobile = () => window.matchMedia('(max-width: 820px)').matches;
+// Sparmodus für Handys/Tablets: weniger Pixel, keine Nachbearbeitung, kleinere Schatten, weniger Geometrie, gedrosselte Bildrate im Leerlauf
+const LITE = window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(max-width: 820px)').matches || new URLSearchParams(location.search).has('lite');
 const dot2 = (a, b) => a[0] * b[0] + a[1] * b[1];
 const neg2 = a => [-a[0], -a[1]];
 const unit2 = a => { const l = Math.hypot(a[0], a[1]) || 1; return [a[0] / l, a[1] / l]; };
@@ -720,7 +724,7 @@ const texDef = (kind, key) => texDefs(kind)[key] || texDefs(kind).farbe;
 const canvasCache = new Map(), materialCache = new Map();
 // Texturen: am Rechner 1024 px (Muster wird skaliert gemalt + feine Körnung in voller Auflösung), am Handy 512 px
 const BUMP_K = 1.0;
-const TEX_RES = () => isMobile() ? 512 : 1024;
+const TEX_RES = () => LITE ? 512 : 1024;
 // Relief-Stärke je Textur (0 = glatt); bei Ziegelmauern ist der Mörtel hell, liegt aber tiefer → umgekehrt
 const BUMP = { wall: { putz: 0.7, ziegel: 1.8, beton: 0.8, holz: 1.1, fliesen: 1.2, tapete: 0.25 }, floor: { parkett: 1.1, laminat: 0.9, fliesen: 1.2, teppich: 1.0, beton: 0.8, marmor: 0.3 },
   roof: { ziegel: 2.2, anthrazit: 2.2, schiefer: 1.8, blech: 1.4, gruen: 1.4, kies: 1.8 }, env: { grass: 1.4, lawn: 1.4 } };
@@ -762,7 +766,7 @@ function getMaterial(kind, spec) {
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1 / def.size, 1 / def.size);
     t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
     m = new THREE.MeshStandardMaterial({ map: t, roughness: def.rough ?? 0.9, metalness: 0, side: kind === 'floor' || kind === 'roof' ? THREE.DoubleSide : THREE.FrontSide });
-    const bs = BUMP[kind]?.[tex] || 0;
+    const bs = LITE ? 0 : (BUMP[kind]?.[tex] || 0);
     if (bs) { const b = new THREE.CanvasTexture(getBumpCanvas(kind, tex, color)); b.wrapS = b.wrapT = THREE.RepeatWrapping; b.repeat.copy(t.repeat); b.anisotropy = 8; m.bumpMap = b; m.bumpScale = bs * BUMP_K; }
     if (kind === 'env') holeShader(m);
     materialCache.set(k, m);
@@ -1479,9 +1483,13 @@ function drawPlan() {
   // Beschriftungen
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   rooms().forEach(r => {
-    const c = interiorPoint(r.points), [x, y] = W2S(c[0], c[1]);
-    ctx.font = '600 13px -apple-system, BlinkMacSystemFont, system-ui, sans-serif'; ctx.fillStyle = '#1d1d1f'; ctx.fillText(r.name, x, y - 7);
-    ctx.font = '12px system-ui, -apple-system, sans-serif'; ctx.fillStyle = '#6e6e73'; ctx.fillText(fmtA(Math.abs(polyArea(r.points))), x, y + 9);
+    const c = interiorPoint(r.points), [x, y] = W2S(c[0], c[1]), bb = polyBBox(r.points), maxW = bb.w * P.scale - 10, maxH = bb.d * P.scale;
+    // Schrift an den Raum anpassen: zu klein → nur der Name, kleiner gesetzt
+    let fs = 13; ctx.font = `600 ${fs}px -apple-system, BlinkMacSystemFont, system-ui, sans-serif`;
+    const tw = ctx.measureText(r.name).width; if (tw > maxW) fs = Math.max(9, Math.floor(13 * maxW / tw));
+    const both = maxH > 34 && fs >= 11;
+    ctx.font = `600 ${fs}px -apple-system, BlinkMacSystemFont, system-ui, sans-serif`; ctx.fillStyle = '#1d1d1f'; ctx.fillText(r.name, x, both ? y - 7 : y);
+    if (both) { ctx.font = '12px system-ui, -apple-system, sans-serif'; ctx.fillStyle = '#6e6e73'; ctx.fillText(fmtA(Math.abs(polyArea(r.points))), x, y + 9); }
   });
 
   const sel = rooms().find(r => r.id === P.sel);
@@ -2423,8 +2431,8 @@ let CAP_MAT, FRAME_MAT, LEAF_MAT, HANDLE_MAT, GLASS_MAT, HL_MAT, PREV_OK, PREV_B
 function init3D() {
   const host = $('#three-host');
   const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true }); // log. Tiefenpuffer gegen Flimmern (z-fighting)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LITE ? 1.5 : 2));
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = LITE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25; // filmischer Look
   host.append(renderer.domElement);
@@ -2459,7 +2467,7 @@ function init3D() {
   T3.lights = { hemi, fill, room };
   T3.lamps = [0, 1, 2, 3, 4, 5].map(i => { const l = new THREE.PointLight(0xffc37a, 0, i < 2 ? 18 : 22, 1.6); scene.add(l); return l; });
   const sun = new THREE.DirectionalLight(0xfff1dc, 2.5);
-  sun.castShadow = true; sun.shadow.mapSize.set(isMobile() ? 2048 : 4096, isMobile() ? 2048 : 4096); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
+  sun.castShadow = true; sun.shadow.mapSize.set(LITE ? 1024 : 4096, LITE ? 1024 : 4096); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
   scene.add(sun); scene.add(sun.target);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), getMaterial('env', { tex: 'grass', color: ENV_TEX.grass.color }));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.02; ground.receiveShadow = true; ground.userData = { kind: 'ground' };
@@ -2482,6 +2490,7 @@ function init3D() {
 
   Object.assign(T3, { renderer, labels, scene, camera, controls, sun, ground, env, world, preview });
   // Postprocessing: HDR-Puffer mit MSAA → Bloom (Lichter glühen) → Vignette → Tonemapping
+  if (!LITE) {
   const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: renderer.capabilities.isWebGL2 ? 4 : 0 });
   const composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
@@ -2493,7 +2502,10 @@ function init3D() {
   });
   composer.addPass(vignette); composer.addPass(new OutputPass());
   Object.assign(T3, { composer, bloom, vignette });
+  }
   controls.addEventListener('start', () => cancelCine()); // Nutzer greift ein → Kamerafahrt abbrechen
+  controls.addEventListener('change', () => { T3.lastInput = performance.now(); });
+  for (const ev of ['pointerdown', 'pointermove', 'pointerup', 'wheel', 'keydown', 'keyup', 'input', 'change', 'click']) document.addEventListener(ev, () => { T3.lastInput = performance.now(); }, { passive: true, capture: true });
   new ResizeObserver(resize3D).observe(host);
   bind3DEvents();
 }
@@ -2501,8 +2513,8 @@ function resize3D() {
   if (!T3.renderer) return;
   const host = $('#three-host'), w = host.clientWidth, h = host.clientHeight; if (!w || !h) return;
   T3.renderer.setSize(w, h); T3.labels.setSize(w, h);
-  T3.composer.setPixelRatio(T3.renderer.getPixelRatio()); T3.composer.setSize(w, h);
-  T3.camera.aspect = w / h; T3.camera.updateProjectionMatrix();
+  T3.composer?.setPixelRatio(T3.renderer.getPixelRatio()); T3.composer?.setSize(w, h);
+  T3.camera.aspect = w / h; T3.camera.updateProjectionMatrix(); T3.dirty = true;
 }
 function disposeTree(obj) { obj.traverse(o => { if (o.isMesh && o.geometry) o.geometry.dispose(); }); }
 function clearWorld() {
@@ -2551,6 +2563,7 @@ function build3D({ fit = false } = {}) {
       (s.kind === 'opening' && !T3.placementOf.has(s.id)) || (s.kind === 'item' && !itemById(s.id)))) T3.sel = null;
   applyHighlight(); renderProps(); renderRooms3d(); updateSun();
   if (fit || !T3.fitted) { fitCamera(T3.introDone ? 'fly' : 'intro'); T3.fitted = true; }
+  T3.dirty = true;
 }
 /* ---------- Treppen ---------- */
 const isStair = it => !!FURN[it.type]?.stair;
@@ -3152,6 +3165,7 @@ function polyBBox(pts) { let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = 
 // Laub: verbeulte, glatt schattierte Kugeln mit Blatt-Textur (statt kantiger Low-Poly-Kugeln)
 const leafGeos = new Map();
 function leafGeo(i, detail = 3) {
+  if (LITE) detail = Math.max(1, detail - 1);
   if (!leafGeos.has(detail)) leafGeos.set(detail, [0, 1, 2, 3].map(k => {
     let g = new THREE.IcosahedronGeometry(1, detail); g.deleteAttribute('normal'); g.deleteAttribute('uv'); g = mergeVertices(g);
     const p = g.attributes.position, R = mulberry32(500 + k), ph = [R() * 6, R() * 6, R() * 6];
@@ -3232,7 +3246,7 @@ function buildEnvironment() {
     T3.ground.position.y = -0.03;
     T3.ground.material = getMaterial('env', { tex: 'grass', color: nightCol(ENV_TEX.grass.color) });
     const r2 = r1 + size * 1.5 + 35, trunkMat = plainMat(nightCol('#3b2c22'), { roughness: 1 });
-    for (let i = 0; i < 90; i++) {
+    for (let i = 0; i < (LITE ? 45 : 90); i++) {
       const a = R() * Math.PI * 2, r = r1 + (r2 - r1) * Math.sqrt(R()), x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
       const s = 0.8 + R() * 0.9, mat = leafMats[Math.floor(R() * leafMats.length)];
       add(trunk, trunkMat, x, 0.6 * s, z, s, 1.2 * s, s);
@@ -3382,7 +3396,7 @@ function buildLines(floor, group, active) {
   }
 }
 function buildCity({ px0, px1, pz0, pz1, cx, cz, night, R, lights }) {
-  const SW = 3.2, RW = 10, P = 46, K = 3, CURB = 0.12, Y0 = -CURB;
+  const SW = 3.2, RW = 10, P = 46, K = LITE ? 2 : 3, CURB = 0.12, Y0 = -CURB;
   const batch = makeBatch(), env = T3.env;
   // Asphalt als Gelände
   T3.ground.position.y = Y0;
@@ -3740,7 +3754,7 @@ function applyHighlight() {
   }
 }
 function setSel(s) {
-  T3.sel = s; applyHighlight(); renderProps(); renderRooms3d();
+  T3.dirty = true; T3.sel = s; applyHighlight(); renderProps(); renderRooms3d();
   if (s && isMobile()) openSheet('panel-3d');
 }
 
@@ -4778,6 +4792,17 @@ function initUI() {
 }
 
 /* ---------- Render-Schleife ---------- */
+// Raum-Labels, die sich überlagern, ausblenden (größere Räume haben Vorrang)
+function declutterLabels() {
+  if (!labelsVisible() || !T3.labelEls.size) return;
+  const items = [...T3.labelEls].map(([id, el]) => ({ el, r: roomById(id), box: el.getBoundingClientRect() })).filter(x => x.r && x.box.width);
+  items.sort((a, b) => Math.abs(polyArea(b.r.points)) - Math.abs(polyArea(a.r.points)));
+  const placed = [];
+  for (const x of items) {
+    const b = x.box, hit = placed.some(p => b.left < p.right + 4 && p.left < b.right + 4 && b.top < p.bottom + 2 && p.top < b.bottom + 2);
+    x.el.classList.toggle('lbl-hidden', hit); if (!hit) placed.push(b);
+  }
+}
 let last = performance.now();
 function loop(now) {
   requestAnimationFrame(loop);
@@ -4787,9 +4812,15 @@ function loop(now) {
   else if (T3.walk.active) { updateWalk(dt); T3.lights.room.position.copy(T3.camera.position).y += 0.5; } else T3.controls.update();
   if (T3.fovAnim) { const A = T3.fovAnim; A.t = Math.min(1, A.t + dt / A.dur); setFov(A.f0 + (A.f1 - A.f0) * easeOut(A.t)); if (A.t >= 1) T3.fovAnim = null; }
   T3.lights.room.intensity = T3.walk.active ? (state.world.night ? 9 : 6) : 0;
-  for (const f of T3.anims) f(dt);
-  T3.composer.render(dt);
+  // Leerlauf: im Sparmodus nur neu zeichnen, wenn sich etwas tut (Stadt-Animationen mit 30 Bildern/s)
+  T3.accDt = (T3.accDt || 0) + dt;
+  const busy = T3.fly || T3.walk.active || T3.drag || T3.fovAnim || T3.dirty || now - (T3.lastInput || 0) < 1200;
+  if (LITE && !busy) { if (!T3.anims.length) return; T3.skip = !T3.skip; if (T3.skip) return; }
+  const adt = Math.min(0.1, T3.accDt); T3.accDt = 0; T3.dirty = false;
+  for (const f of T3.anims) f(adt);
+  if (LITE) T3.renderer.render(T3.scene, T3.camera); else T3.composer.render(adt);
   T3.labels.render(T3.scene, T3.camera);
+  if ((T3.lblN = ((T3.lblN || 0) + 1) % 6) === 0) declutterLabels();
 }
 
 initUI();
