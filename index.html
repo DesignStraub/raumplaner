@@ -173,7 +173,45 @@ canvas#plan{position:absolute;inset:0;width:100%;height:100%;display:block;touch
   .floorbar{top:52px;right:8px;max-width:120px}
   #view-3d .statusbar{max-width:none}
 }
+/* ---------- Typografie: Kontrast aus fetten und dünnen Schnitten ---------- */
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Helvetica Neue",Helvetica,Arial,sans-serif}
+.brand,h3,.sheet-head,.cat-title,.label3d b{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Inter","Helvetica Neue",Helvetica,Arial,sans-serif}
+.thin{font-weight:200}
+.light{font-weight:300}
+.brand{font-size:18px;letter-spacing:-.03em;gap:9px}
+.brand b{font-weight:700}
+.brand .thin{font-weight:200;margin-left:-.12em}
+h3{font-size:16px;font-weight:700;letter-spacing:-.025em;margin-bottom:12px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+h3 .thin{font-weight:200;color:#6e6e73;letter-spacing:-.015em}
+.sheet-head{font-size:20px !important;letter-spacing:-.03em !important}
+.tabs .tab-long{font-weight:300}
+.kv span{font-weight:300}
+.kv b{font-weight:600}
+.floorbar .fb-title{font-weight:300;letter-spacing:.08em}
+.label3d{font-weight:600}
+.label3d .thin{font-weight:300;opacity:.75;margin-left:5px}
+.statusbar{font-weight:400}
+/* ---------- Möbel-Katalog ---------- */
+.cat-chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin:0 0 10px;scrollbar-width:none}
+.cat-chips::-webkit-scrollbar{display:none}
+.cat-chips button{font:inherit;flex:none;border:0;border-radius:980px;padding:6px 12px;font-size:12.5px;font-weight:500;background:var(--fill);color:var(--text);cursor:pointer;white-space:nowrap}
+.cat-chips button.active{background:var(--text);color:#fff}
+.catalog button{flex-direction:column;align-items:flex-start;gap:2px;padding:10px 11px}
+.catalog .ct{display:flex;align-items:center;gap:7px;font-weight:600;letter-spacing:-.01em}
+.catalog .cs{font-size:11px;font-weight:300;color:var(--muted);padding-left:21px}
+.cat-title{font-size:11px;font-weight:300;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:12px 0 6px;grid-column:1/-1}
+.cat-title:first-child{margin-top:0}
+#catalog-search{width:100%;margin-bottom:10px}
+section.flash{animation:flash 1.1s ease}
+@keyframes flash{0%,100%{box-shadow:0 .5px 1px rgba(0,0,0,.05)}25%{box-shadow:0 0 0 3px rgba(0,113,227,.45)}}
+.floorbar button.whole{font-weight:600;border-bottom:.5px solid var(--sep);border-radius:8px 8px 4px 4px;margin-bottom:2px}
+.sub{font-size:12px;color:var(--muted);font-weight:300;margin:-4px 0 10px}
+.valrow{display:flex;justify-content:space-between;align-items:baseline}
+.valrow b{font-weight:600;font-size:12px;color:var(--text)}
 </style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -185,7 +223,7 @@ canvas#plan{position:absolute;inset:0;width:100%;height:100%;display:block;touch
 <header>
   <div class="brand">
     <svg viewBox="0 0 24 24" fill="none" stroke="#0071e3" stroke-width="2" stroke-linejoin="round"><path d="M3 11 12 4l9 7v9H3z"/><path d="M9 20v-6h6v6"/></svg>
-    <span>Raumplaner</span>
+    <span><b>Raum</b><span class="thin">planer</span></span>
   </div>
   <input type="text" id="project-name" aria-label="Projektname" placeholder="Projektname">
   <div class="tabs">
@@ -217,6 +255,7 @@ canvas#plan{position:absolute;inset:0;width:100%;height:100%;display:block;touch
         <h3>Ebenen</h3>
         <div class="list" id="floor-list"></div>
         <div class="field" style="margin-top:10px"><label for="floor-name">Name dieser Ebene</label><input type="text" id="floor-name"></div>
+        <div class="field"><label for="floor-kind">Art dieser Ebene</label><select id="floor-kind"><option value="normal">Normales Stockwerk</option><option value="roof">Dachgeschoss (Dach obendrauf)</option></select><p class="hint" id="floor-kind-hint" style="margin-top:2px"></p></div>
         <div class="grid2">
           <div class="field"><label for="def-height">Wandhöhe (m)</label><input type="number" id="def-height" min="2" max="5" step="0.05"></div>
           <div class="field"><label>&nbsp;</label><button class="btn small danger" id="floor-del">Ebene löschen</button></div>
@@ -298,6 +337,8 @@ canvas#plan{position:absolute;inset:0;width:100%;height:100%;display:block;touch
         <div class="toolgrid five" id="tools3d"></div>
       </section>
       <section class="group" id="props"></section>
+      <section class="group" id="catalog-box"></section>
+      <section class="group" id="house-box"></section>
       <section class="group">
         <h3>Ansicht</h3>
         <div class="field"><label for="cut">Wände abschneiden: <b id="cut-val">aus</b></label><input type="range" id="cut" min="0.3" max="2.6" step="0.05" value="2.6"></div>
@@ -529,6 +570,37 @@ const D = {
     speckle(ctx, S, c, 3000, 1.2, 0.05, 87);
   },
   grass(ctx, S, c) { fill(ctx, S, c); blotches(ctx, S, c, 40, 30, 120, 0.1, 91); speckle(ctx, S, c, 26000, 1.6, 0.14, 93); },
+  // Dachziegel: Reihen mit gerundeter Unterkante (Canvas oben = First)
+  rooftile(ctx, S, c) {
+    const rows = 12, cols = 8, rh = S / rows, cw = S / cols, R = mulberry32(101);
+    fill(ctx, S, shade(c, -0.45));
+    for (let r = 0; r < rows; r++) {
+      const y = r * rh, off = (r % 2) * cw / 2;
+      for (let k = -1; k <= cols; k++) {
+        const x = k * cw + off, f = (R() * 2 - 1) * 0.08;
+        const g = ctx.createLinearGradient(0, y, 0, y + rh); g.addColorStop(0, shade(c, f - 0.12)); g.addColorStop(0.75, shade(c, f + 0.06)); g.addColorStop(1, shade(c, f - 0.2));
+        ctx.fillStyle = g; ctx.beginPath();
+        ctx.moveTo(x + 1, y); ctx.lineTo(x + cw - 1, y); ctx.lineTo(x + cw - 1, y + rh * 0.62);
+        ctx.quadraticCurveTo(x + cw / 2, y + rh * 1.12, x + 1, y + rh * 0.62); ctx.closePath(); ctx.fill();
+      }
+    }
+    speckle(ctx, S, c, 7000, 1.4, 0.12, 103);
+  },
+  slate(ctx, S, c) {
+    const rows = 16, cols = 7, rh = S / rows, cw = S / cols, R = mulberry32(111);
+    fill(ctx, S, shade(c, -0.5));
+    for (let r = 0; r < rows; r++) { const off = (r % 2) * cw / 2; for (let k = -1; k <= cols; k++) { ctx.fillStyle = shade(c, (R() * 2 - 1) * 0.12); ctx.fillRect(k * cw + off + 1.5, r * rh + 1.5, cw - 3, rh - 2.5); } }
+    speckle(ctx, S, c, 6000, 1.2, 0.1, 113);
+  },
+  seam(ctx, S, c) {
+    const n = 8, w = S / n; fill(ctx, S, c); blotches(ctx, S, c, 20, 40, 120, 0.04, 121);
+    for (let i = 0; i < n; i++) {
+      const g = ctx.createLinearGradient(i * w, 0, (i + 1) * w, 0); g.addColorStop(0, shadeA(c, 0.1, 0.6)); g.addColorStop(0.5, shadeA(c, 0, 0)); g.addColorStop(1, shadeA(c, -0.12, 0.6));
+      ctx.fillStyle = g; ctx.fillRect(i * w, 0, w, S);
+      ctx.fillStyle = shadeA(c, 0.35, 0.9); ctx.fillRect(i * w, 0, 2, S); ctx.fillStyle = shadeA(c, -0.45, 0.9); ctx.fillRect(i * w + 2, 0, 2, S);
+    }
+  },
+  gravel(ctx, S, c) { fill(ctx, S, c); blotches(ctx, S, c, 30, 20, 80, 0.06, 131); speckle(ctx, S, c, 30000, 2.6, 0.25, 133); },
 };
 const WALL_TEX = {
   farbe:   { name: 'Glatt (nur Farbe)', color: '#f5f5f2', size: 1, draw: D.plain, rough: 0.95 },
@@ -548,8 +620,17 @@ const FLOOR_TEX = {
   beton:   { name: 'Beton', color: '#9d9d98', size: 2, draw: D.concrete },
   marmor:  { name: 'Marmor', color: '#eceae4', size: 2, draw: D.marble, rough: 0.25 },
 };
+const ROOF_TEX = {
+  ziegel:   { name: 'Dachziegel rot', color: '#a5442f', size: 1.4, draw: D.rooftile, rough: 0.8 },
+  anthrazit:{ name: 'Dachziegel anthrazit', color: '#3c3f44', size: 1.4, draw: D.rooftile, rough: 0.7 },
+  schiefer: { name: 'Schiefer', color: '#4a5058', size: 1.2, draw: D.slate, rough: 0.6 },
+  blech:    { name: 'Blech (Stehfalz)', color: '#6f767d', size: 2.4, draw: D.seam, rough: 0.45 },
+  gruen:    { name: 'Gründach', color: '#4f6b3a', size: 3, draw: D.grass },
+  kies:     { name: 'Kies (Flachdach)', color: '#8f8a80', size: 1.5, draw: D.gravel },
+  farbe:    { name: 'Glatt (nur Farbe)', color: '#5a4a42', size: 1, draw: D.plain },
+};
 const ENV_TEX = { grass: { name: 'Wiese', color: '#24301f', size: 6, draw: D.grass }, lawn: { name: 'Rasen', color: '#34452a', size: 4, draw: D.grass } };
-const texDefs = kind => kind === 'wall' ? WALL_TEX : kind === 'env' ? ENV_TEX : FLOOR_TEX;
+const texDefs = kind => kind === 'wall' ? WALL_TEX : kind === 'env' ? ENV_TEX : kind === 'roof' ? ROOF_TEX : FLOOR_TEX;
 const texDef = (kind, key) => texDefs(kind)[key] || texDefs(kind).farbe;
 const canvasCache = new Map(), materialCache = new Map();
 function getTexCanvas(kind, key, color) {
@@ -568,7 +649,7 @@ function getMaterial(kind, spec) {
     const t = new THREE.CanvasTexture(getTexCanvas(kind, tex, color));
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1 / def.size, 1 / def.size);
     t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
-    m = new THREE.MeshStandardMaterial({ map: t, roughness: def.rough ?? 0.9, metalness: 0, side: kind === 'floor' ? THREE.DoubleSide : THREE.FrontSide });
+    m = new THREE.MeshStandardMaterial({ map: t, roughness: def.rough ?? 0.9, metalness: 0, side: kind === 'floor' || kind === 'roof' ? THREE.DoubleSide : THREE.FrontSide });
     materialCache.set(k, m);
   }
   return m;
@@ -643,7 +724,44 @@ const FURN = {
   teppich: { name: 'Teppich', w: 2.0, d: 1.4, color: '#b65b4a', parts: [['b', 'main', 0, 0.006, 0, 2.0, 0.012, 1.4]] },
   lampe: { name: 'Stehlampe', w: 0.4, d: 0.4, color: '#f3ead8', parts: [
     ['c', 'dark', 0, 0.02, 0, 0.15, 0.04], ['c', 'metal', 0, 0.8, 0, 0.015, 1.6], ['c', 'shade', 0, 1.6, 0, 0.2, 0.3]] },
+  ecksofa: { name: 'Ecksofa', w: 2.6, d: 1.8, color: '#8d8a84', parts: [
+    ['b', 'main', 0, 0.2, -0.45, 2.6, 0.4, 0.9], ['b', 'main', 0.85, 0.2, 0.45, 0.9, 0.4, 0.9],
+    ['b', 'main2', 0, 0.47, -0.35, 2.2, 0.14, 0.7], ['b', 'main2', 0.75, 0.47, 0.42, 0.7, 0.14, 0.85],
+    ['b', 'main', 0, 0.625, -0.8, 2.6, 0.45, 0.2], ['b', 'main', -1.2, 0.5, -0.45, 0.2, 0.6, 0.9], ['b', 'main', 1.2, 0.5, 0, 0.2, 0.6, 1.8]] },
+  sideboard: { name: 'Sideboard', w: 1.8, d: 0.45, color: '#5b4636', parts: [
+    ['b', 'main', 0, 0.45, 0, 1.8, 0.7, 0.45], ['b', 'dark', -0.3, 0.45, 0.226, 0.008, 0.64, 0.004], ['b', 'dark', 0.3, 0.45, 0.226, 0.008, 0.64, 0.004],
+    ['b', 'dark', -0.85, 0.05, -0.18, 0.04, 0.1, 0.04], ['b', 'dark', 0.85, 0.05, -0.18, 0.04, 0.1, 0.04], ['b', 'dark', -0.85, 0.05, 0.18, 0.04, 0.1, 0.04], ['b', 'dark', 0.85, 0.05, 0.18, 0.04, 0.1, 0.04]] },
+  nachttisch: { name: 'Nachttisch', w: 0.45, d: 0.4, color: '#c9b49a', parts: [
+    ['b', 'main', 0, 0.25, 0, 0.45, 0.5, 0.4], ['b', 'dark', 0, 0.34, 0.201, 0.41, 0.006, 0.004], ['b', 'metal', 0, 0.42, 0.21, 0.08, 0.02, 0.02]] },
+  kommode: { name: 'Kommode', w: 1.0, d: 0.5, color: '#efe9df', parts: [
+    ['b', 'main', 0, 0.45, 0, 1.0, 0.9, 0.5], ['b', 'dark', 0, 0.3, 0.251, 0.96, 0.006, 0.004], ['b', 'dark', 0, 0.6, 0.251, 0.96, 0.006, 0.004],
+    ['b', 'metal', 0, 0.16, 0.26, 0.12, 0.02, 0.02], ['b', 'metal', 0, 0.45, 0.26, 0.12, 0.02, 0.02], ['b', 'metal', 0, 0.75, 0.26, 0.12, 0.02, 0.02]] },
+  kuecheninsel: { name: 'Kücheninsel', w: 1.9, d: 1.0, color: '#2f3b45', parts: [
+    ['b', 'main', 0, 0.43, 0, 1.8, 0.86, 0.9], ['b', 'counter', 0, 0.88, 0, 1.9, 0.04, 1.0], ['b', 'metal', 0.4, 0.902, 0, 0.5, 0.01, 0.4]] },
+  barhocker: { name: 'Barhocker', w: 0.4, d: 0.4, color: '#3d3f44', parts: [
+    ['c', 'main', 0, 0.75, 0, 0.18, 0.05], ['c', 'metal', 0, 0.37, 0, 0.025, 0.72], ['c', 'metal', 0, 0.01, 0, 0.2, 0.02], ['c', 'metal', 0, 0.3, 0, 0.15, 0.015]] },
+  rundtisch: { name: 'Runder Tisch', w: 1.1, d: 1.1, color: '#ece7df', parts: [
+    ['c', 'main', 0, 0.73, 0, 0.55, 0.04], ['c', 'dark', 0, 0.355, 0, 0.05, 0.71], ['c', 'dark', 0, 0.015, 0, 0.26, 0.03]] },
+  buerostuhl: { name: 'Bürostuhl', w: 0.6, d: 0.6, color: '#2b2d31', parts: [
+    ['c', 'dark', 0, 0.05, 0, 0.3, 0.03], ['c', 'metal', 0, 0.27, 0, 0.03, 0.42], ['b', 'main', 0, 0.5, 0, 0.5, 0.08, 0.5], ['b', 'main', 0, 0.82, -0.23, 0.46, 0.5, 0.06]] },
+  waschmaschine: { name: 'Waschmaschine', w: 0.6, d: 0.6, color: '#f2f2f0', parts: [
+    ['b', 'main', 0, 0.425, 0, 0.6, 0.85, 0.6], ['b', 'dark', 0, 0.42, 0.301, 0.34, 0.34, 0.006], ['b', 'glass', 0, 0.42, 0.306, 0.28, 0.28, 0.006], ['b', 'metal', 0, 0.78, 0.302, 0.56, 0.08, 0.004]] },
+  garderobe: { name: 'Garderobe', w: 1.0, d: 0.35, color: '#c8a27a', parts: [
+    ['b', 'main', 0, 1.0, -0.16, 1.0, 1.6, 0.03], ['b', 'main', 0, 1.7, -0.02, 1.0, 0.03, 0.3], ['b', 'main', 0, 0.45, -0.02, 1.0, 0.04, 0.3],
+    ['b', 'metal', -0.3, 1.5, -0.1, 0.02, 0.02, 0.1], ['b', 'metal', 0, 1.5, -0.1, 0.02, 0.02, 0.1], ['b', 'metal', 0.3, 1.5, -0.1, 0.02, 0.02, 0.1]] },
+  kinderbett: { name: 'Kinderbett', w: 0.75, d: 1.45, color: '#f1ede6', parts: [
+    ['b', 'main', 0, 0.2, 0, 0.75, 0.12, 1.45], ['b', 'mattress', 0, 0.3, 0, 0.7, 0.1, 1.4], ['b', 'main', 0, 0.45, -0.71, 0.75, 0.9, 0.04], ['b', 'main', 0, 0.45, 0.71, 0.75, 0.9, 0.04],
+    ['b', 'main', -0.36, 0.55, 0, 0.03, 0.5, 1.4], ['b', 'main', 0.36, 0.55, 0, 0.03, 0.5, 1.4]] },
 };
+// Kategorien für den Katalog
+const FURN_CATS = [
+  ['wohnen', 'Wohnen', ['sofa', 'ecksofa', 'sessel', 'couchtisch', 'tv', 'sideboard', 'regal']],
+  ['schlafen', 'Schlafen', ['bett', 'einzelbett', 'kinderbett', 'nachttisch', 'kommode', 'schrank']],
+  ['kueche', 'Küche & Essen', ['kueche', 'kuecheninsel', 'kuehlschrank', 'esstisch', 'rundtisch', 'stuhl', 'barhocker']],
+  ['bad', 'Bad', ['badewanne', 'dusche', 'wc', 'waschbecken', 'waschmaschine']],
+  ['arbeiten', 'Arbeiten', ['schreibtisch', 'buerostuhl']],
+  ['deko', 'Flur & Deko', ['garderobe', 'teppich', 'pflanze', 'lampe']],
+];
 function furnMat(key, color) {
   switch (key) {
     case 'main': return plainMat(color, { roughness: 0.75 });
@@ -695,12 +813,23 @@ const TEMPLATES = {
     ['Gästezimmer', [[7, 6], [12, 6], [12, 9], [7, 9]]],
   ] },
 };
-function newFloor(name, wallHeight = 2.6) { return { id: 'f' + uid(), name, wallHeight, rooms: [], openings: [], items: [], sides: [], wallNames: [], exterior: null }; }
+function newFloor(name, wallHeight = 2.6) { return { id: 'f' + uid(), name, wallHeight, rooms: [], openings: [], items: [], sides: [], wallNames: [], exterior: null, roof: false }; }
+const ROOF_TYPES = { sattel: 'Satteldach', walm: 'Walmdach', flach: 'Flachdach' };
+function defaultWorld() { return { env: 'garden', garden: 5, night: false, facade: null, roof: { type: 'sattel', pitch: 38, turn: false, spec: { tex: 'ziegel', color: ROOF_TEX.ziegel.color } } }; }
+function normWorld(w) {
+  const d = defaultWorld(); if (!w || typeof w !== 'object') return d;
+  const r = w.roof || {};
+  return { env: w.env === 'city' ? 'city' : 'garden', garden: clamp(isFinite(+w.garden) && w.garden !== null ? +w.garden : d.garden, 1, 30), night: !!w.night,
+    facade: normSpec('wall', w.facade, null),
+    roof: { type: ROOF_TYPES[r.type] ? r.type : 'sattel', pitch: clamp(+r.pitch || 38, 10, 60), turn: !!r.turn, spec: normSpec('roof', r.spec, d.roof.spec) } };
+}
+// Nur die oberste Ebene darf ein Dachgeschoss sein
+function fixRoofFlags(s) { s.floors.forEach((f, i) => { if (i !== s.floors.length - 1) f.roof = false; }); }
 function defaultState() {
   const f = newFloor('Erdgeschoss');
   return { version: 2, name: 'Mein Zuhause', wallThickness: 0.15,
     defaults: { wall: { tex: 'farbe', color: WALL_TEX.farbe.color }, floor: { tex: 'farbe', color: FLOOR_TEX.farbe.color } },
-    floors: [f], activeFloor: f.id };
+    floors: [f], activeFloor: f.id, world: defaultWorld() };
 }
 function normSpec(kind, s, fallback) {
   if (!s || !texDefs(kind)[s.tex]) return fallback;
@@ -736,7 +865,7 @@ function normFloor(f, i) {
     wallHeight: clamp(+f.wallHeight || 2.6, 2, 5), rooms: normRooms(f.rooms),
     openings: (f.openings || []).map(normOpening).filter(Boolean), items: (f.items || []).map(normItem).filter(Boolean),
     sides: (f.sides || []).map(e => normSeg(e, true)).filter(Boolean), wallNames: (f.wallNames || []).map(e => normSeg(e, false)).filter(Boolean),
-    exterior: normSpec('wall', f.exterior, null) };
+    exterior: normSpec('wall', f.exterior, null), roof: !!f.roof };
 }
 // Version 1 (eine Ebene, Daten pro Wandstück) in Version 2 umwandeln
 function migrateV1(s) {
@@ -768,6 +897,7 @@ function normalizeState(s) {
   else if (Array.isArray(s.rooms)) out.floors = [migrateV1(s)];
   else throw new Error('Das ist keine gültige Raumplaner-Datei.');
   out.activeFloor = out.floors.some(f => f.id === s.activeFloor) ? s.activeFloor : out.floors[0].id;
+  out.world = normWorld(s.world); fixRoofFlags(out);
   return out;
 }
 function roomsFromTemplate(key) { return (TEMPLATES[key]?.rooms || []).map(([name, pts]) => ({ id: uid(), name, points: pts.map(p => [...p]), floor: null, wallSpec: null })); }
@@ -869,6 +999,7 @@ function resolveSide(floor, w, side) {
   const rid = w[side];
   if (rid) { const r = roomById(rid); if (r?.wallSpec) return { spec: r.wallSpec, via: 'room' }; }
   else if (floor.exterior) return { spec: floor.exterior, via: 'ext' };
+  else if (state.world.facade) return { spec: state.world.facade, via: 'facade' };
   return { spec: state.defaults.wall, via: 'default' };
 }
 function setSideSpec(floor, w, side, spec) {
@@ -1371,31 +1502,44 @@ function renderFloorUI() {
   $('#floor-name').value = f.name;
   $('#def-height').value = f.wallHeight;
   $('#floor-del').disabled = state.floors.length < 2;
+  const isTop = f === state.floors[state.floors.length - 1];
+  $('#floor-kind').value = f.roof ? 'roof' : 'normal'; $('#floor-kind').disabled = !isTop;
+  $('#floor-kind-hint').textContent = isTop ? (f.roof ? `Auf diese Ebene kommt das Dach (${ROOF_TYPES[state.world.roof.type]}). Form und Deckung stellst du in der 3D-Ansicht unter „Haus & Umgebung“ ein.` : 'Wähle „Dachgeschoss“, damit das Haus oben ein Dach bekommt.')
+    : 'Nur die oberste Ebene kann das Dachgeschoss sein.';
   // Schwebende Umschalter
   for (const id of ['#floorbar-plan', '#floorbar-3d']) {
     const bar = $(id); bar.innerHTML = '<div class="fb-title">Ebenen</div>';
+    const in3d = id === '#floorbar-3d';
+    if (in3d) {
+      const wb = document.createElement('button'); wb.className = 'whole' + (T3.whole ? ' active' : ''); wb.textContent = 'Ganzes Haus'; wb.title = 'Alle Ebenen mit Dach von außen ansehen';
+      wb.addEventListener('click', () => setWhole(!T3.whole));
+      bar.append(wb);
+    }
     [...state.floors].reverse().forEach(fl => {
-      const b = document.createElement('button'); b.textContent = fl.name; b.title = fl.name;
-      if (fl.id === f.id) b.className = 'active';
-      b.addEventListener('click', () => setActiveFloor(fl.id));
+      const b = document.createElement('button'); b.textContent = (fl.roof ? '⌂ ' : '') + fl.name; b.title = fl.name + (fl.roof ? ' (Dachgeschoss)' : '');
+      if (fl.id === f.id && !(in3d && T3.whole)) b.className = 'active';
+      b.addEventListener('click', () => { if (in3d && T3.whole) { T3.whole = false; setActiveFloor(fl.id, true); } else setActiveFloor(fl.id); });
       bar.append(b);
     });
     const add = document.createElement('button'); add.className = 'add'; add.textContent = '+ Ebene'; add.title = 'Neue Ebene oben anlegen (Grundriss wird kopiert)';
     add.addEventListener('click', () => addFloor(true));
     bar.append(add);
   }
-  $('#rooms-title').textContent = `Räume · ${f.name}`;
-  $('#rooms3d-title').textContent = `Räume · ${f.name}`;
+  $('#rooms-title').innerHTML = `Räume <span class="thin">${esc(f.name)}</span>`;
+  $('#rooms3d-title').innerHTML = `Räume <span class="thin">${esc(f.name)}</span>`;
 }
 function floorDefaultName(i) { return i === 0 ? 'Erdgeschoss' : `${i}. Obergeschoss`; }
 function addFloor(copy) {
   checkpoint();
   const cur = F(), f = newFloor(floorDefaultName(state.floors.length), cur.wallHeight);
   if (copy) f.rooms = cur.rooms.map(r => ({ id: uid(), name: r.name, points: r.points.map(p => [...p]), floor: null, wallSpec: null }));
+  const top = state.floors[state.floors.length - 1], roofMoved = top.roof;
+  if (roofMoved) { top.roof = false; f.roof = true; }
   state.floors.push(f);
   scheduleSave();
+  T3.whole = false;
   setActiveFloor(f.id, true);
-  toast(copy ? `„${f.name}“ angelegt – Grundriss übernommen, passe ihn an.` : `„${f.name}“ angelegt – zeichne die Räume.`);
+  toast((copy ? `„${f.name}“ angelegt – Grundriss übernommen, passe ihn an.` : `„${f.name}“ angelegt – zeichne die Räume.`) + (roofMoved ? ' Das Dach ist mit nach oben gewandert.' : ''));
 }
 function deleteFloor() {
   if (state.floors.length < 2) return;
@@ -1411,14 +1555,14 @@ function setActiveFloor(id, force) {
   if (!force && id === state.activeFloor) return;
   const oldBase = floorBase(floorIdx());
   state.activeFloor = id; P.sel = null; P.draft = []; P.action = null; updateDraftBar();
-  T3.sel = null; T3.cut = null;
+  T3.sel = null; T3.cut = null; T3.whole = false;
   scheduleSave();
   renderFloorUI(); renderPlanPanels(); requestPlanDraw(); updateStatus();
   if (mode === '3d') {
     if (T3.walk.active) stopWalk();
     const dy = floorBase(floorIdx()) - oldBase;
     T3.camera.position.y += dy; T3.controls.target.y += dy; T3.controls.update();
-    syncCutSlider(); build3D(); syncTools3d();
+    syncCutSlider(); build3D(); syncTools3d(); renderHouse();
   }
 }
 function renderPlanPanels() {
@@ -1467,6 +1611,7 @@ const T3 = { renderer: null, scene: null, camera: null, controls: null, labels: 
   activeGroup: null, walls: [], wallMap: new Map(), wallGroups: new Map(), openingGroups: new Map(), itemGroups: new Map(), labelEls: new Map(),
   placements: new Map(), placementOf: new Map(), unplaced: [],
   tool: 'select', sel: null, hl: [], cut: null, showLabels: true, fitted: false, drag: null,
+  whole: false, roofGroup: null, lamps: [], lights: {}, stars: null, skyDay: null, skyNight: null, cat: 'alle', catQuery: '',
   walk: { active: false, yaw: 0, pitch: 0, keys: new Set(), saved: null, look: null, move: null } };
 let CAP_MAT, FRAME_MAT, LEAF_MAT, HANDLE_MAT, GLASS_MAT, HL_MAT, PREV_OK, PREV_BAD, SLAB_MAT;
 
@@ -1481,18 +1626,30 @@ function init3D() {
   Object.assign(labels.domElement.style, { position: 'absolute', left: '0', top: '0', pointerEvents: 'none' });
   host.append(labels.domElement);
   const scene = new THREE.Scene();
-  // Abendhimmel (Verlauf) + Nebel → Umgebung tritt zurück
-  const sky = document.createElement('canvas'); sky.width = 2; sky.height = 256;
-  const sg = sky.getContext('2d'), gr = sg.createLinearGradient(0, 0, 0, 256);
-  gr.addColorStop(0, '#0d1220'); gr.addColorStop(0.55, '#1f2a3a'); gr.addColorStop(1, '#3a4656');
-  sg.fillStyle = gr; sg.fillRect(0, 0, 2, 256);
-  const skyTex = new THREE.CanvasTexture(sky); skyTex.colorSpace = THREE.SRGBColorSpace;
-  scene.background = skyTex;
+  // Himmel (Verlauf) + Nebel → Umgebung tritt zurück
+  const skyTex = stops => {
+    const sky = document.createElement('canvas'); sky.width = 2; sky.height = 256;
+    const sg = sky.getContext('2d'), gr = sg.createLinearGradient(0, 0, 0, 256);
+    stops.forEach(([t, c]) => gr.addColorStop(t, c)); sg.fillStyle = gr; sg.fillRect(0, 0, 2, 256);
+    const t = new THREE.CanvasTexture(sky); t.colorSpace = THREE.SRGBColorSpace; return t;
+  };
+  T3.skyDay = skyTex([[0, '#0d1220'], [0.55, '#1f2a3a'], [1, '#3a4656']]);
+  T3.skyNight = skyTex([[0, '#010207'], [0.6, '#060b18'], [1, '#121a2c']]);
+  scene.background = T3.skyDay;
   scene.fog = new THREE.Fog('#2c3746', 40, 180);
+  // Sterne (nur nachts sichtbar)
+  const sp = [], SR = mulberry32(77);
+  for (let i = 0; i < 700; i++) { const a = SR() * Math.PI * 2, e = Math.asin(0.08 + SR() * 0.92), r = 600; sp.push(Math.cos(e) * Math.cos(a) * r, Math.sin(e) * r, Math.cos(e) * Math.sin(a) * r); }
+  const sgeo = new THREE.BufferGeometry(); sgeo.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+  const stars = new THREE.Points(sgeo, new THREE.PointsMaterial({ color: '#dfe6ff', size: 1.6, sizeAttenuation: false, fog: false, transparent: true, opacity: 0.85 }));
+  stars.visible = false; stars.raycast = () => {}; scene.add(stars); T3.stars = stars;
   const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 900);
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true; controls.dampingFactor = 0.08; controls.maxPolarAngle = Math.PI * 0.495; controls.minDistance = 1; controls.maxDistance = 150;
-  scene.add(new THREE.HemisphereLight(0xd6e0ee, 0x3a4636, 1.7));
+  const hemi = new THREE.HemisphereLight(0xd6e0ee, 0x3a4636, 1.7); scene.add(hemi);
+  const fill = new THREE.DirectionalLight(0xffe2bf, 0); fill.position.set(-30, 25, -20); scene.add(fill); // nachts: warmes Licht aufs Haus
+  T3.lights = { hemi, fill };
+  T3.lamps = [0, 1].map(() => { const l = new THREE.PointLight(0xffc37a, 0, 18, 1.6); scene.add(l); return l; });
   const sun = new THREE.DirectionalLight(0xfff1dc, 2.5);
   sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
   scene.add(sun); scene.add(sun.target);
@@ -1545,17 +1702,20 @@ function boxUV(g) {
 const shapeOf = pts => new THREE.Shape(pts.map(p => new THREE.Vector2(p[0], -p[1])));
 function floorGeometry(pts) { const g = new THREE.ShapeGeometry(shapeOf(pts)); g.rotateX(-Math.PI / 2); return g; }
 function slabGeometry(pts) { const g = new THREE.ExtrudeGeometry(shapeOf(pts), { depth: SLAB, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, -SLAB + 0.001, 0); return g; }
-function viewHeight(floor) { return (T3.walk.active || floor !== F()) ? floor.wallHeight : Math.min(floor.wallHeight, T3.cut ?? floor.wallHeight); }
+function viewHeight(floor) { return (T3.walk.active || T3.whole || floor !== F()) ? floor.wallHeight : Math.min(floor.wallHeight, T3.cut ?? floor.wallHeight); }
+const labelsVisible = () => T3.showLabels && !T3.walk.active && !T3.whole;
+const labelHTML = r => `${esc(r.name)}<span class="thin">${fmtA(Math.abs(polyArea(r.points)))}</span>`;
 
 function build3D({ fit = false } = {}) {
   if (!T3.renderer) init3D();
   clearWorld();
-  const ai = floorIdx();
+  const ai = floorIdx(), last = T3.whole ? state.floors.length - 1 : ai;
   T3.unplaced = [];
-  for (let i = 0; i <= ai; i++) buildFloor(state.floors[i], i, i === ai);
-  buildEnvironment();
+  for (let i = 0; i <= last; i++) buildFloor(state.floors[i], i, i === ai);
+  buildRoof();
+  buildEnvironment(); applyTimeOfDay();
   const s = T3.sel;
-  if (s && ((s.kind === 'wall' && !T3.wallMap.has(s.key)) || (s.kind === 'floor' && !rooms().some(r => r.id === s.roomId)) ||
+  if (s && ((s.kind === 'wall' && !T3.wallMap.has(s.key)) || (s.kind === 'floor' && !rooms().some(r => r.id === s.roomId)) || (s.kind === 'roof' && !T3.roofGroup) ||
       (s.kind === 'opening' && !T3.placementOf.has(s.id)) || (s.kind === 'item' && !itemById(s.id)))) T3.sel = null;
   applyHighlight(); renderProps(); renderRooms3d(); updateSun();
   if (fit || !T3.fitted) { fitCamera(); T3.fitted = true; }
@@ -1579,9 +1739,9 @@ function buildFloor(floor, idx, active) {
     group.add(m);
     if (active) {
       const c = interiorPoint(r.points);
-      const el = document.createElement('div'); el.className = 'label3d'; el.textContent = r.name;
-      el.style.display = T3.showLabels && !T3.walk.active ? '' : 'none';
+      const el = document.createElement('div'); el.className = 'label3d'; el.innerHTML = labelHTML(r);
       const lab = new CSS2DObject(el); lab.position.set(c[0], Math.min(1.2, viewH + 0.2), c[1]);
+      lab.visible = labelsVisible(); el._obj = lab; // CSS2DRenderer steuert display selbst über visible
       group.add(lab); T3.labelEls.set(r.id, el);
     }
   }
@@ -1663,64 +1823,223 @@ function buildItem(it, parent, active) {
   parent.add(g); if (active) T3.itemGroups.set(it.id, g);
 }
 
-/* ---------- Umgebung (kleine, dunklere Welt) ---------- */
+/* ---------- Dach ---------- */
+const roofFloor = () => { const f = state.floors[state.floors.length - 1]; return f && f.roof && f.rooms.length ? f : null; };
+const roofShown = () => { const rf = roofFloor(); return !!rf && (T3.whole || (T3.walk.active && rf === F())); };
+const exteriorSpec = floor => floor.exterior || state.world.facade || state.defaults.wall;
+// Sammelt Dreiecke (Vielecke werden als Fächer zerlegt, entartete Dreiecke übersprungen)
+function polyBuilder() {
+  const pos = [], uv = [];
+  return {
+    add(pts, uvs) {
+      for (let i = 1; i < pts.length - 1; i++) {
+        const a = pts[0], b = pts[i], c = pts[i + 1];
+        const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+        const cx = ab[1] * ac[2] - ab[2] * ac[1], cy = ab[2] * ac[0] - ab[0] * ac[2], cz = ab[0] * ac[1] - ab[1] * ac[0];
+        if (Math.hypot(cx, cy, cz) < 1e-8) continue;
+        pos.push(...a, ...b, ...c);
+        const ua = uvs ? uvs[0] : [0, 0], ub = uvs ? uvs[i] : [0, 0], uc = uvs ? uvs[i + 1] : [0, 0];
+        uv.push(...ua, ...ub, ...uc);
+      }
+    },
+    build() {
+      if (!pos.length) return null;
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.computeVertexNormals(); return g;
+    },
+  };
+}
+function buildRoof() {
+  T3.roofGroup = null;
+  if (!roofShown()) return;
+  const rf = roofFloor(), idx = state.floors.indexOf(rf), R = state.world.roof, T = state.wallThickness;
+  let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+  for (const r of rf.rooms) for (const p of r.points) { x0 = Math.min(x0, p[0]); z0 = Math.min(z0, p[1]); x1 = Math.max(x1, p[0]); z1 = Math.max(z1, p[1]); }
+  const top = floorBase(idx) + rf.wallHeight;
+  const g = new THREE.Group(); g.userData = { kind: 'roof' }; T3.world.add(g); T3.roofGroup = g;
+  const roofMat = getMaterial('roof', R.spec), soffit = plainMat('#d9d4cc', { roughness: 0.95 }), fascia = plainMat('#3a3c40', { roughness: 0.7 });
+  const addMesh = (geo, mat, parent = g) => { if (!geo) return; const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true; m.userData = { kind: 'roof' }; parent.add(m); return m; };
+  if (R.type === 'flach') {
+    for (const r of rf.rooms) {
+      const m = addMesh(slabGeometry(r.points), [roofMat, SLAB_MAT]);
+      m.position.y = top + SLAB;
+    }
+    return;
+  }
+  const X0 = x0 - T / 2, X1 = x1 + T / 2, Z0 = z0 - T / 2, Z1 = z1 + T / 2;
+  const lenX = X1 - X0, lenZ = Z1 - Z0;
+  let alongX = lenX >= lenZ; if (R.type === 'sattel' && R.turn) alongX = !alongX;
+  const Lx = (alongX ? lenX : lenZ) / 2, Wz = (alongX ? lenZ : lenX) / 2;
+  const a = R.pitch * Math.PI / 180, tA = Math.tan(a), ca = Math.cos(a), tv = 0.14 / ca, o = 0.45;
+  const lg = new THREE.Group(); lg.position.set((X0 + X1) / 2, top, (Z0 + Z1) / 2); lg.rotation.y = alongX ? 0 : Math.PI / 2; g.add(lg);
+  const Z = Wz + o, yE = -o * tA + tv, yR = Wz * tA + tv;
+  const topB = polyBuilder(), under = polyBuilder(), edge = polyBuilder();
+  const down = p => [p[0], p[1] - tv, p[2]];
+  const face = (pts, uvs) => { topB.add(pts, uvs); under.add(pts.map(down)); };
+  const strip = (p, q) => edge.add([p, q, down(q), down(p)]);
+  if (R.type === 'sattel') {
+    const X = Lx + 0.35, s = Z / ca;
+    for (const sg of [1, -1]) {
+      const e1 = [-X, yE, sg * Z], e2 = [X, yE, sg * Z], r2 = [X, yR, 0], r1 = [-X, yR, 0];
+      face([e1, e2, r2, r1], [[-X, 0], [X, 0], [X, s], [-X, s]]);
+      strip(e1, e2); strip(e2, r2); strip(r1, e1);
+    }
+    // Giebeldreiecke in Fassadenfarbe
+    const sh = new THREE.Shape([new THREE.Vector2(-Wz, 0), new THREE.Vector2(Wz, 0), new THREE.Vector2(0, Wz * tA)]);
+    const wallMat = getMaterial('wall', exteriorSpec(rf));
+    for (const end of [1, -1]) {
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: T, bevelEnabled: false }); geo.rotateY(-Math.PI / 2);
+      const m = addMesh(geo, wallMat, lg); m.position.x = end > 0 ? Lx : -Lx + T;
+    }
+  } else { // Walmdach
+    const r = Math.max(0, Lx - Wz), X = Lx + o, s = Z / ca;
+    for (const sg of [1, -1]) {
+      const e1 = [-X, yE, sg * Z], e2 = [X, yE, sg * Z], r2 = [r, yR, 0], r1 = [-r, yR, 0];
+      face([e1, e2, r2, r1], [[-X, 0], [X, 0], [r, s], [-r, s]]);
+      strip(e1, e2);
+      const f1 = [sg * X, yE, Z], f2 = [sg * X, yE, -Z], rr = [sg * r, yR, 0];
+      face([f1, f2, rr], [[Z, 0], [-Z, 0], [0, s]]);
+      strip(f1, f2);
+    }
+  }
+  addMesh(topB.build(), roofMat, lg); addMesh(under.build(), soffit, lg); addMesh(edge.build(), fascia, lg);
+}
+
+/* ---------- Umgebung: Garten oder Stadt, Tag oder Nacht ---------- */
 function allBBox() {
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
   for (const f of state.floors) for (const r of f.rooms) for (const p of r.points) { x0 = Math.min(x0, p[0]); z0 = Math.min(z0, p[1]); x1 = Math.max(x1, p[0]); z1 = Math.max(z1, p[1]); }
   if (!isFinite(x0)) return { x0: -5, z0: -5, x1: 5, z1: 5, cx: 0, cz: 0, size: 10 };
   return { x0, z0, x1, z1, cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, size: Math.max(x1 - x0, z1 - z0, 4) };
 }
+const nightCol = c => state.world.night ? shadeHex(c, -0.6) : c;
+const facadeMatCache = new Map();
+function cityFacadeMat(color, night, seed) {
+  const k = `${color}|${night}|${seed}`; let m = facadeMatCache.get(k); if (m) return m;
+  const S = 256, cell = S / 4, R = mulberry32(seed);
+  const c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d');
+  const e = document.createElement('canvas'); e.width = e.height = S; const ex = e.getContext('2d');
+  const base = night ? shadeHex(color, -0.55) : color;
+  x.fillStyle = base; x.fillRect(0, 0, S, S); speckle(x, S, base, 2500, 1.4, 0.08, seed + 1);
+  ex.fillStyle = '#000'; ex.fillRect(0, 0, S, S);
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+    const wx = i * cell + cell * 0.22, wy = j * cell + cell * 0.2, ww = cell * 0.56, wh = cell * 0.55;
+    const lit = night && R() < 0.38;
+    if (lit) { x.fillStyle = R() < 0.5 ? '#ffd79a' : '#ffe9c4'; ex.fillStyle = x.fillStyle; ex.fillRect(wx, wy, ww, wh); }
+    else if (night) x.fillStyle = '#0e131c';
+    else { const g = x.createLinearGradient(wx, wy, wx + ww, wy + wh); g.addColorStop(0, '#6d7d90'); g.addColorStop(1, '#2c3644'); x.fillStyle = g; }
+    x.fillRect(wx, wy, ww, wh);
+  }
+  const mk = cv => { const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1 / 12, 1 / 12); t.colorSpace = THREE.SRGBColorSpace; return t; };
+  m = new THREE.MeshStandardMaterial({ map: mk(c), roughness: 0.85, metalness: 0, emissive: night ? '#ffffff' : '#000000', emissiveMap: night ? mk(e) : null, emissiveIntensity: night ? 0.9 : 0 });
+  facadeMatCache.set(k, m); return m;
+}
+function addLantern(x, z, parent) {
+  const night = state.world.night;
+  const pole = plainMat('#24262a', { roughness: 0.6, metalness: 0.4 });
+  const head = plainMat(night ? '#fff1d0' : '#d9d6cf', { roughness: 0.4, emissive: night ? '#ffc879' : '#000000', emissiveIntensity: night ? 2.2 : 0 });
+  const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 3.4, 10), pole); p.position.set(x, 1.7, z); p.castShadow = true; parent.add(p);
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.18, 0.12, 12), pole); cap.position.set(x, 3.52, z); parent.add(cap);
+  const h = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.12, 0.34, 12), head); h.position.set(x, 3.3, z); parent.add(h);
+  return new THREE.Vector3(x, 3.2, z);
+}
 function buildEnvironment() {
-  const bb = allBBox();
-  const key = [bb.x0, bb.z0, bb.x1, bb.z1].map(v => v.toFixed(1)).join();
+  const bb = allBBox(), W = state.world;
+  const key = [bb.x0, bb.z0, bb.x1, bb.z1].map(v => v.toFixed(1)).join() + `|${W.env}|${W.garden}|${W.night}`;
   if (T3.envKey === key) return; T3.envKey = key;
   disposeTree(T3.env); T3.env.clear();
-  const { cx, cz, size } = bb;
-  // Grundstück (Rasen) mit Rand
-  const pw = bb.x1 - bb.x0 + 9, pd = bb.z1 - bb.z0 + 9;
-  const lawn = new THREE.Mesh(new THREE.PlaneGeometry(pw, pd), getMaterial('env', { tex: 'lawn', color: ENV_TEX.lawn.color }));
-  lawn.rotation.x = -Math.PI / 2; lawn.position.set(cx, -0.01, cz); lawn.receiveShadow = true; T3.env.add(lawn);
-  const edgeMat = plainMat('#5d5a54', { roughness: 1 });
-  for (const [x, z, w, d] of [[cx, bb.z0 - 4.5, pw + 0.3, 0.15], [cx, bb.z1 + 4.5, pw + 0.3, 0.15], [bb.x0 - 4.5, cz, 0.15, pd], [bb.x1 + 4.5, cz, 0.15, pd]]) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.08, d), edgeMat); m.position.set(x, 0.02, z); m.receiveShadow = true; T3.env.add(m);
+  const { cx, cz, size } = bb, m = W.garden, city = W.env === 'city', night = W.night;
+  const add = (geo, mat, x, y, z, sx = 1, sy = 1, sz = 1, shadow = false) => { const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.castShadow = shadow; o.receiveShadow = true; T3.env.add(o); return o; };
+  const flat = (w, d, mat, x, z, y) => { const o = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat); o.rotation.x = -Math.PI / 2; o.position.set(x, y, z); o.receiveShadow = true; T3.env.add(o); return o; };
+  // Boden außen
+  T3.ground.material = city ? plainMat(nightCol('#2b2d31'), { roughness: 0.95 }) : getMaterial('env', { tex: 'grass', color: nightCol(ENV_TEX.grass.color) });
+  // Grundstück (Rasen) mit Rand, Größe = Haus + Abstand m
+  const px0 = bb.x0 - m, px1 = bb.x1 + m, pz0 = bb.z0 - m, pz1 = bb.z1 + m, pw = px1 - px0, pd = pz1 - pz0;
+  flat(pw, pd, getMaterial('env', { tex: 'lawn', color: nightCol(ENV_TEX.lawn.color) }), cx, cz, -0.01);
+  const edgeMat = plainMat(nightCol('#5d5a54'), { roughness: 1 });
+  for (const [x, z, w, d] of [[cx, pz0, pw + 0.15, 0.15], [cx, pz1, pw + 0.15, 0.15], [px0, cz, 0.15, pd], [px1, cz, 0.15, pd]]) add(new THREE.BoxGeometry(w, 0.08, d), edgeMat, x, 0.02, z);
+  // Weg zur Straße / zum Gartentor
+  flat(1.4, m, plainMat(nightCol('#6a665f'), { roughness: 1 }), cx, bb.z1 + m / 2, -0.005);
+  // Büsche entlang der Grundstücksgrenze
+  const R = mulberry32(1234), leafMats = ['#1f3a28', '#24432c', '#2b4a30', '#1b3324', '#30502f'].map(c => plainMat(nightCol(c), { roughness: 1, flatShading: true }));
+  const ball = new THREE.IcosahedronGeometry(1, 0), cone = new THREE.ConeGeometry(1, 1, 7), trunk = new THREE.CylinderGeometry(0.12, 0.18, 1, 6);
+  const perim = 2 * (pw + pd), nb = Math.min(60, Math.round(perim / 2.2));
+  for (let i = 0; i < nb; i++) {
+    let t = (i + R() * 0.6) / nb * perim, x, z;
+    if (t < pw) { x = px0 + t; z = pz0 + 0.7; } else if ((t -= pw) < pd) { x = px1 - 0.7; z = pz0 + t; } else if ((t -= pd) < pw) { x = px1 - t; z = pz1 - 0.7; } else { t -= pw; x = px0 + 0.7; z = pz1 - t; }
+    if (Math.abs(z - pz1) < 1 && Math.abs(x - cx) < 1.6) continue; // Weg frei lassen
+    const s = 0.35 + R() * 0.35; add(ball, leafMats[Math.floor(R() * 5)], x, s * 0.6, z, s * 1.3, s, s * 1.3);
   }
-  // Weg zum Haus
-  const path = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 4.5), plainMat('#5f5b55', { roughness: 1 }));
-  path.rotation.x = -Math.PI / 2; path.position.set(cx, -0.005, bb.z1 + 2.25); path.receiveShadow = true; T3.env.add(path);
-  // Bäume, Büsche, Steine, Hügel
-  const R = mulberry32(1234);
-  const r1 = size * 0.75 + 8, r2 = size * 2.2 + 40;
-  const trunkMat = plainMat('#3b2c22', { roughness: 1 });
-  const leafMats = ['#1f3a28', '#24432c', '#2b4a30', '#1b3324', '#30502f'].map(c => plainMat(c, { roughness: 1, flatShading: true }));
-  const cone = new THREE.ConeGeometry(1, 1, 7), ball = new THREE.IcosahedronGeometry(1, 0), trunk = new THREE.CylinderGeometry(0.12, 0.18, 1, 6);
-  const add = (geo, mat, x, y, z, sx, sy, sz, shadow = false) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = shadow; m.receiveShadow = true; T3.env.add(m); return m; };
-  for (let i = 0; i < 90; i++) {
-    const a = R() * Math.PI * 2, r = r1 + (r2 - r1) * Math.sqrt(R()), x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-    const s = 0.8 + R() * 0.9, mat = leafMats[Math.floor(R() * leafMats.length)];
-    add(trunk, trunkMat, x, 0.6 * s, z, s, 1.2 * s, s);
-    if (R() < 0.55) { add(cone, mat, x, 1.2 * s + 1.6 * s, z, 1.4 * s, 3.4 * s, 1.4 * s); add(cone, mat, x, 1.2 * s + 2.8 * s, z, 1.0 * s, 2.4 * s, 1.0 * s); }
-    else { const m = add(ball, mat, x, 1.2 * s + 1.3 * s, z, 1.6 * s, 1.5 * s, 1.6 * s); m.rotation.y = R() * 3; }
+  // Laternen an der Grundstücksgrenze
+  const lampPos = [addLantern(cx - 1.4, pz1 + 0.5, T3.env), addLantern(cx + 1.4, pz1 + 0.5, T3.env)];
+  T3.lamps.forEach((l, i) => { l.position.copy(lampPos[i]); l.intensity = night ? 22 : 0; });
+  const r1 = Math.hypot(pw, pd) / 2 + 4;
+  if (city) {
+    // Gehweg und Straße rundherum, dahinter Häuserblöcke
+    flat(pw + 5, pd + 5, plainMat(nightCol('#8a8780'), { roughness: 1 }), cx, cz, -0.014);
+    const lineMat = plainMat(night ? '#6d6a5e' : '#d9d4c4', { roughness: 1 });
+    const ry0 = pz0 - 2.5 - 4, ry1 = pz1 + 2.5 + 4, rx0 = px0 - 2.5 - 4, rx1 = px1 + 2.5 + 4;
+    for (let x = rx0 - 30; x < rx1 + 30; x += 4) { flat(2, 0.14, lineMat, x, ry0, -0.012); flat(2, 0.14, lineMat, x, ry1, -0.012); }
+    for (let z = ry0 - 30; z < ry1 + 30; z += 4) { flat(0.14, 2, lineMat, rx0, z, -0.012); flat(0.14, 2, lineMat, rx1, z, -0.012); }
+    const colors = ['#8c8f94', '#a39b8f', '#6f7782', '#b3aea4', '#5d636b', '#9a8c7c'];
+    const roofM = plainMat(nightCol('#3a3d42'), { roughness: 1 });
+    const inner = { x0: px0 - 2.5 - 8 - 1, x1: px1 + 2.5 + 8 + 1, z0: pz0 - 2.5 - 8 - 1, z1: pz1 + 2.5 + 8 + 1 };
+    const cell = 15, reach = 120;
+    for (let gx = inner.x0 - reach; gx < inner.x1 + reach; gx += cell) for (let gz = inner.z0 - reach; gz < inner.z1 + reach; gz += cell) {
+      const ccx = gx + cell / 2, ccz = gz + cell / 2;
+      if (ccx > inner.x0 - cell / 2 && ccx < inner.x1 + cell / 2 && ccz > inner.z0 - cell / 2 && ccz < inner.z1 + cell / 2) continue;
+      if (R() < 0.12) continue;
+      const dist = Math.hypot(ccx - cx, ccz - cz);
+      const w = 8 + R() * 4.5, d = 8 + R() * 4.5, h = 6 + R() * (8 + dist * 0.28), ci = Math.floor(R() * colors.length);
+      const geo = new THREE.BoxGeometry(w, h, d); geo.translate(0, h / 2, 0); boxUV(geo);
+      const fm = cityFacadeMat(colors[ci], night, 500 + (ci * 7 + Math.floor(R() * 3)));
+      const b = new THREE.Mesh(geo, [fm, fm, roofM, roofM, fm, fm]); b.position.set(ccx, 0, ccz); b.castShadow = dist < r1 + 40; b.receiveShadow = true; T3.env.add(b);
+    }
+  } else {
+    // Bäume, Steine, Hügel
+    const r2 = r1 + size * 1.5 + 35, trunkMat = plainMat(nightCol('#3b2c22'), { roughness: 1 });
+    for (let i = 0; i < 90; i++) {
+      const a = R() * Math.PI * 2, r = r1 + (r2 - r1) * Math.sqrt(R()), x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+      const s = 0.8 + R() * 0.9, mat = leafMats[Math.floor(R() * leafMats.length)];
+      add(trunk, trunkMat, x, 0.6 * s, z, s, 1.2 * s, s);
+      if (R() < 0.55) { add(cone, mat, x, 2.8 * s, z, 1.4 * s, 3.4 * s, 1.4 * s); add(cone, mat, x, 4.0 * s, z, 1.0 * s, 2.4 * s, 1.0 * s); }
+      else { const o = add(ball, mat, x, 2.5 * s, z, 1.6 * s, 1.5 * s, 1.6 * s); o.rotation.y = R() * 3; }
+    }
+    const rockMat = plainMat(nightCol('#4a4e52'), { roughness: 1, flatShading: true });
+    for (let i = 0; i < 14; i++) {
+      const a = R() * Math.PI * 2, r = r1 + R() * (r2 - r1) * 0.5, s = 0.3 + R() * 0.7;
+      const o = add(ball, rockMat, cx + Math.cos(a) * r, s * 0.3, cz + Math.sin(a) * r, s * 1.4, s * 0.8, s); o.rotation.y = R() * 3;
+    }
+    const hillMat = plainMat(nightCol('#22302a'), { roughness: 1, flatShading: true });
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 + R() * 0.4, r = r2 + 30 + R() * 50, s = 25 + R() * 35;
+      add(ball, hillMat, cx + Math.cos(a) * r, -s * 0.35, cz + Math.sin(a) * r, s * 1.6, s * 0.7, s * 1.3);
+    }
   }
-  for (let i = 0; i < 26; i++) {
-    const a = R() * Math.PI * 2, r = size * 0.55 + 5 + R() * 4, x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-    const s = 0.4 + R() * 0.5; add(ball, leafMats[4], x, s * 0.6, z, s * 1.3, s, s * 1.3);
-  }
-  const rockMat = plainMat('#4a4e52', { roughness: 1, flatShading: true });
-  for (let i = 0; i < 14; i++) {
-    const a = R() * Math.PI * 2, r = r1 * 0.8 + R() * (r2 - r1) * 0.5, s = 0.3 + R() * 0.7;
-    const m = add(ball, rockMat, cx + Math.cos(a) * r, s * 0.3, cz + Math.sin(a) * r, s * 1.4, s * 0.8, s); m.rotation.y = R() * 3;
-  }
-  const hillMat = plainMat('#22302a', { roughness: 1, flatShading: true });
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * Math.PI * 2 + R() * 0.4, r = r2 + 30 + R() * 50, s = 25 + R() * 35;
-    add(ball, hillMat, cx + Math.cos(a) * r, -s * 0.35, cz + Math.sin(a) * r, s * 1.6, s * 0.7, s * 1.3);
-  }
-  T3.scene.fog.near = size * 1.6 + 25; T3.scene.fog.far = size * 6 + 200;
+  T3.scene.fog.near = size * 1.6 + 25 + m; T3.scene.fog.far = size * 6 + 200 + m * 2;
+  applyTimeOfDay();
+}
+function applyTimeOfDay() {
+  const n = state.world.night, L = T3.lights;
+  T3.scene.background = n ? T3.skyNight : T3.skyDay;
+  T3.scene.fog.color.set(n ? '#0a1020' : '#2c3746');
+  L.hemi.color.set(n ? '#6a7ca6' : '#d6e0ee'); L.hemi.groundColor.set(n ? '#151a16' : '#3a4636'); L.hemi.intensity = n ? 1.0 : 1.7;
+  T3.sun.color.set(n ? '#b8c6ff' : '#fff1dc'); T3.sun.intensity = n ? 0.6 : 2.5;
+  L.fill.intensity = n ? 0.7 : 0;
+  T3.stars.visible = n;
+  GLASS_MAT.emissive.set(n ? '#ffcf87' : '#000000'); GLASS_MAT.emissiveIntensity = n ? 0.7 : 0;
 }
 
 function fitCamera() {
-  const bb = allBBox(), base = floorBase(floorIdx());
-  const k = Math.max(1, 0.9 / T3.camera.aspect);
+  const bb = allBBox(), k = Math.max(1, 0.9 / T3.camera.aspect);
+  if (T3.whole) {
+    const H = floorBase(state.floors.length) + (roofFloor() ? 3 : 0);
+    T3.camera.position.set(bb.cx + bb.size * 0.75 * k, H * 0.5 + (bb.size * 0.45 + H * 0.4 + 2) * k, bb.cz + (bb.size * 1.25 + H * 0.6) * k);
+    T3.controls.target.set(bb.cx, H * 0.4, bb.cz); T3.controls.update(); return;
+  }
+  const base = floorBase(floorIdx());
   T3.camera.position.set(bb.cx + bb.size * 0.15 * k, base + (bb.size * 0.95 + 2) * k, bb.cz + bb.size * 0.9 * k);
   T3.controls.target.set(bb.cx, base, bb.cz); T3.controls.update();
 }
@@ -1749,8 +2068,8 @@ function applyHighlight() {
   } else if (s.kind === 'floor') {
     const r = rooms().find(x => x.id === s.roomId); if (!r) return;
     const m = new THREE.Mesh(floorGeometry(r.points), HL_MAT); m.position.y = 0.012; add(m, T3.activeGroup);
-  } else if (s.kind === 'opening' || s.kind === 'item') {
-    const og = (s.kind === 'opening' ? T3.openingGroups : T3.itemGroups).get(s.id); if (!og) return;
+  } else if (s.kind === 'opening' || s.kind === 'item' || s.kind === 'roof') {
+    const og = s.kind === 'roof' ? T3.roofGroup : (s.kind === 'opening' ? T3.openingGroups : T3.itemGroups).get(s.id); if (!og) return;
     T3.world.updateMatrixWorld(true);
     add(new THREE.Box3Helper(new THREE.Box3().setFromObject(og), new THREE.Color('#0071e3')), T3.scene);
   }
@@ -1767,7 +2086,7 @@ function setRay(e) {
 }
 function pick(e, skip) {
   setRay(e);
-  const targets = [T3.ground]; if (T3.activeGroup) targets.unshift(T3.activeGroup);
+  const targets = [T3.ground]; if (T3.activeGroup) targets.unshift(T3.activeGroup); if (T3.roofGroup) targets.unshift(T3.roofGroup);
   const hits = raycaster.intersectObjects(targets, true);
   for (const h of hits) {
     let o = h.object; while (o && !o.userData?.kind) o = o.parent;
@@ -1843,6 +2162,7 @@ function onClick3D(e) {
   else if (p.ud.kind === 'floor') setSel({ kind: 'floor', roomId: p.ud.roomId });
   else if (p.ud.kind === 'opening') setSel({ kind: 'opening', id: p.ud.id });
   else if (p.ud.kind === 'item') setSel({ kind: 'item', id: p.ud.id });
+  else if (p.ud.kind === 'roof') setSel({ kind: 'roof' });
 }
 
 /* ---------- Ziehen von Türen, Fenstern und Möbeln ---------- */
@@ -1936,6 +2256,7 @@ function duplicateItem(id) {
 function startWalk() {
   if (!rooms().length) { toast('Auf dieser Ebene gibt es keine Räume.', 'error'); T3.tool = 'select'; syncTools3d(); return; }
   const W = T3.walk;
+  if (T3.whole) { T3.whole = false; renderFloorUI(); renderHouse(); }
   W.saved = { pos: T3.camera.position.clone(), target: T3.controls.target.clone() };
   const room = (T3.sel?.kind === 'floor' && rooms().find(r => r.id === T3.sel.roomId)) || rooms()[0];
   const p = interiorPoint(room.points), base = floorBase(floorIdx());
@@ -2071,6 +2392,7 @@ function key3d(e, isDown) {
   const s = T3.sel;
   if (s?.kind === 'item' && e.key.toLowerCase() === 'r') { rotateItem(s.id, (e.shiftKey ? -1 : 1) * Math.PI / 2); return; }
   const tools = { v: 'select', t: 'door', f: 'window', m: 'furniture', b: 'walk' };
+  if (e.key.toLowerCase() === 'm') { showCatalog(); return; }
   if (tools[e.key.toLowerCase()]) { setTool3d(tools[e.key.toLowerCase()]); return; }
   if (e.key === 'Escape') { setTool3d('select'); setSel(null); return; }
   if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -2093,12 +2415,11 @@ function setTool3d(t) {
   T3.tool = t; if (T3.preview) T3.preview.visible = false;
   syncTools3d();
   if (t === 'walk') startWalk();
-  if (t === 'furniture') { renderProps(); if (isMobile()) openSheet('panel-3d'); }
   else if (T3.sel == null) renderProps();
 }
 function syncTools3d() {
   document.querySelectorAll('[data-tool3d]').forEach(b => b.classList.toggle('active', b.dataset.tool3d === T3.tool));
-  $('#status-3d').textContent = `${F().name} · ${TOOL3D_HINTS[T3.tool]()}`;
+  $('#status-3d').textContent = `${T3.whole ? 'Ganzes Haus' : F().name} · ${TOOL3D_HINTS[T3.tool]()}`;
   $('#status-3d').hidden = T3.tool === 'walk';
 }
 
@@ -2130,7 +2451,6 @@ function unplacedHTML() {
 function bindUnplaced(box) { box.querySelectorAll('[data-del-open]').forEach(b => b.addEventListener('click', () => { checkpoint(); F().openings = F().openings.filter(x => x.id !== b.dataset.delOpen); rebuildAfterEdit(); })); }
 function renderProps() {
   const box = $('#props'); const s = T3.sel;
-  if (T3.tool === 'furniture' && !s) return renderCatalog(box);
   if (!s) {
     box.innerHTML = `<h3>Eigenschaften</h3><p class="hint">${isMobile() ? 'Tippe' : 'Klicke'} auf eine <b>Wand</b>, einen <b>Boden</b>, eine <b>Tür</b>, ein <b>Fenster</b> oder ein <b>Möbelstück</b>. Türen, Fenster und Möbel kannst du direkt mit der Maus bzw. dem Finger verschieben.</p>${unplacedHTML()}`;
     bindUnplaced(box);
@@ -2140,21 +2460,140 @@ function renderProps() {
   if (s.kind === 'floor') return renderFloorProps(box, s);
   if (s.kind === 'opening') return renderOpeningProps(box, s);
   if (s.kind === 'item') return renderItemProps(box, s);
+  if (s.kind === 'roof') return renderRoofProps(box);
 }
-function renderCatalog(box) {
-  box.innerHTML = `<h3>Möbel hinzufügen</h3><p class="hint" style="margin:0 0 10px">Wird in den ausgewählten Raum bzw. den Raum in der Bildmitte gestellt. Danach einfach an die richtige Stelle ziehen.</p><div class="catalog"></div>`;
-  const cat = box.querySelector('.catalog');
-  for (const [k, d] of Object.entries(FURN)) {
-    const b = document.createElement('button');
-    b.innerHTML = `<span class="sw" style="background:${d.color}"></span>${esc(d.name)}`;
-    b.addEventListener('click', () => addItem(k));
-    cat.append(b);
-  }
+function renderCatalog() {
+  const box = $('#catalog-box'); if (!box) return;
+  const chips = [['alle', 'Alle'], ...FURN_CATS.map(([k, n]) => [k, n])];
+  box.innerHTML = `<h3>Möbel <span class="thin">hinzufügen</span></h3>
+    <p class="sub">Antippen stellt das Möbelstück in den gewählten Raum (oder den Raum in der Bildmitte). Danach einfach an die richtige Stelle ziehen.</p>
+    <input type="text" id="catalog-search" placeholder="Suchen, z. B. Sofa" value="${esc(T3.catQuery)}">
+    <div class="cat-chips">${chips.map(([k, n]) => `<button data-cat="${k}" class="${T3.cat === k ? 'active' : ''}">${esc(n)}</button>`).join('')}</div>
+    <div class="catalog"></div>`;
+  const fillList = () => {
+    const cat = box.querySelector('.catalog'); cat.innerHTML = '';
+    const q = T3.catQuery.trim().toLowerCase();
+    let n = 0;
+    for (const [k, name, types] of FURN_CATS) {
+      if (!q && T3.cat !== 'alle' && T3.cat !== k) continue;
+      const list = types.filter(t => FURN[t] && (!q || FURN[t].name.toLowerCase().includes(q)));
+      if (!list.length) continue;
+      if (T3.cat === 'alle' || q) { const h = document.createElement('div'); h.className = 'cat-title'; h.textContent = name; cat.append(h); }
+      for (const t of list) {
+        const d = FURN[t], b = document.createElement('button');
+        b.innerHTML = `<span class="ct"><span class="sw" style="background:${d.color}"></span>${esc(d.name)}</span><span class="cs">${cm2(d.w)} × ${cm2(d.d)} cm</span>`;
+        b.addEventListener('click', () => addItem(t));
+        cat.append(b); n++;
+      }
+    }
+    if (!n) cat.innerHTML = '<p class="hint" style="grid-column:1/-1;margin:0">Nichts gefunden.</p>';
+  };
+  box.querySelectorAll('[data-cat]').forEach(b => b.addEventListener('click', () => {
+    T3.cat = b.dataset.cat; T3.catQuery = ''; box.querySelector('#catalog-search').value = '';
+    box.querySelectorAll('[data-cat]').forEach(x => x.classList.toggle('active', x === b)); fillList();
+  }));
+  box.querySelector('#catalog-search').addEventListener('input', e => { T3.catQuery = e.target.value; fillList(); });
+  fillList();
+}
+// Abschnitt im Seitenpanel (bzw. im Handy-Blatt) nach oben holen und kurz hervorheben
+function revealSection(box) {
+  const mobile = isMobile(); if (mobile) openSheet('panel-3d');
+  const panel = box.closest('aside');
+  setTimeout(() => {
+    const head = mobile ? (panel.querySelector('.sheet-head')?.offsetHeight || 0) + 4 : 12;
+    const top = box.getBoundingClientRect().top - panel.getBoundingClientRect().top + panel.scrollTop - head;
+    panel.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    box.classList.remove('flash'); void box.offsetWidth; box.classList.add('flash');
+  }, mobile ? 340 : 0);
+}
+function showCatalog() {
+  if (T3.walk.active) stopWalk();
+  revealSection($('#catalog-box'));
+}
+function showHouseBox() {
+  revealSection($('#house-box'));
+}
+function setWhole(on) {
+  if (on && T3.walk.active) stopWalk();
+  T3.whole = !!on;
+  if (T3.sel && T3.sel.kind === 'roof' && !on) T3.sel = null;
+  renderFloorUI(); build3D(); fitCamera(); syncTools3d(); renderHouse();
+}
+// Kleiner Helfer: Schieberegler mit Live-Vorschau und einem Rückgängig-Schritt
+function bindRange(input, apply, label) {
+  let before = null, queued = false;
+  const start = () => { if (before == null) before = snapshot(); };
+  input.addEventListener('pointerdown', start); input.addEventListener('focus', start); input.addEventListener('keydown', start);
+  input.addEventListener('input', () => {
+    start(); apply(parseFloat(input.value)); label?.();
+    if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; build3D(); }); }
+  });
+  input.addEventListener('change', () => { if (before && before !== snapshot()) pushUndo(before); before = null; scheduleSave(); renderHouse(); });
+}
+function renderHouse() {
+  const box = $('#house-box'); if (!box) return;
+  const W = state.world, R = W.roof, rf = roofFloor(), topF = state.floors[state.floors.length - 1];
+  const seg = (k, opts, cur) => `<div class="seg" data-seg="${k}">${opts.map(([v, n]) => `<button data-v="${v}" class="${cur === v ? 'active' : ''}">${esc(n)}</button>`).join('')}</div>`;
+  box.innerHTML = `<h3>Haus <span class="thin">&amp; Umgebung</span></h3>
+    <div class="field"><label>Ansicht</label>${seg('view', [['floor', 'Diese Ebene'], ['whole', 'Ganzes Haus']], T3.whole ? 'whole' : 'floor')}</div>
+    <div class="field"><label>Fassade (alle Außenwände)</label><div data-slot="facade"></div></div>
+    <div class="field"><label>Dach</label>
+      ${rf ? `<p class="sub" style="margin:0 0 8px">Sitzt auf „${esc(rf.name)}“ (Dachgeschoss)</p>
+        ${seg('roof', Object.entries(ROOF_TYPES), R.type)}
+        ${R.type !== 'flach' ? `<div class="valrow" style="margin-top:10px"><span class="lbl">Neigung</span><b data-out="pitch">${R.pitch}°</b></div><input type="range" data-range="pitch" min="15" max="55" step="1" value="${R.pitch}">` : ''}
+        <div data-slot="roof" style="margin-top:8px"></div>
+        <div class="btnrow" style="margin-top:8px">${R.type === 'sattel' ? '<button class="btn small" data-act="turn">First drehen</button>' : ''}<button class="btn small danger" data-act="noroof">Dach entfernen</button></div>`
+      : `<p class="hint" style="margin:0 0 8px">Noch kein Dach. Das Dach kommt auf die oberste Ebene (Dachgeschoss).</p>
+        ${topF.rooms.length ? `<button class="btn small primary" data-act="roof">Dach auf „${esc(topF.name)}“ setzen</button>` : '<p class="hint" style="margin:0">Die oberste Ebene hat noch keine Räume.</p>'}`}
+    </div>
+    <div class="field"><label>Umgebung</label>${seg('env', [['garden', 'Garten'], ['city', 'Großstadt']], W.env)}</div>
+    <div class="field"><div class="valrow"><span class="lbl">Gartengröße (Abstand zur Grenze)</span><b data-out="garden">${fmtM(W.garden)}</b></div><input type="range" data-range="garden" min="1" max="30" step="0.5" value="${W.garden}"></div>
+    <div class="field" style="margin-bottom:0"><label>Tageszeit</label>${seg('time', [['day', 'Tag'], ['night', 'Nacht']], W.night ? 'night' : 'day')}</div>`;
+  const change = fn => { checkpoint(); fn(); scheduleSave(); build3D(); renderHouse(); renderFloorUI(); };
+  box.querySelectorAll('[data-seg] button').forEach(b => b.addEventListener('click', () => {
+    const k = b.parentElement.dataset.seg, v = b.dataset.v;
+    if (k === 'view') { setWhole(v === 'whole'); return; }
+    if (k === 'roof' && R.type !== v) change(() => {
+      // passende Deckung vorschlagen: Kies fürs Flachdach, Ziegel fürs Steildach
+      const flatTex = R.spec.tex === 'kies' || R.spec.tex === 'gruen';
+      if (v === 'flach' && !flatTex && R.spec.tex !== 'blech' && R.spec.tex !== 'farbe') R.spec = { tex: 'kies', color: ROOF_TEX.kies.color };
+      if (v !== 'flach' && flatTex) R.spec = { tex: 'ziegel', color: ROOF_TEX.ziegel.color };
+      R.type = v;
+    });
+    if (k === 'env' && W.env !== v) change(() => { W.env = v; });
+    if (k === 'time' && W.night !== (v === 'night')) change(() => { W.night = v === 'night'; });
+  }));
+  box.querySelector('[data-slot="facade"]').append(texPicker('wall', W.facade || state.defaults.wall, spec => change(() => {
+    W.facade = spec;
+    for (const f of state.floors) { f.exterior = null; for (const w of computeWalls(f.rooms)) { if (!w.L) clearSideEntries(f, w, 'L'); if (!w.R) clearSideEntries(f, w, 'R'); } }
+    toast('Fassade für alle Außenwände geändert.');
+  })));
+  const rs = box.querySelector('[data-slot="roof"]');
+  if (rs) rs.append(texPicker('roof', R.spec, spec => change(() => { R.spec = spec; })));
+  const pr = box.querySelector('[data-range="pitch"]');
+  if (pr) bindRange(pr, v => { R.pitch = clamp(Math.round(v), 15, 55); }, () => { box.querySelector('[data-out="pitch"]').textContent = R.pitch + '°'; });
+  bindRange(box.querySelector('[data-range="garden"]'), v => { W.garden = clamp(v, 1, 30); }, () => { box.querySelector('[data-out="garden"]').textContent = fmtM(W.garden); });
+  box.querySelector('[data-act="turn"]')?.addEventListener('click', () => change(() => { R.turn = !R.turn; }));
+  box.querySelector('[data-act="noroof"]')?.addEventListener('click', () => { change(() => { topF.roof = false; }); if (T3.sel?.kind === 'roof') setSel(null); toast('Dach entfernt.'); });
+  box.querySelector('[data-act="roof"]')?.addEventListener('click', () => {
+    checkpoint(); topF.roof = true; scheduleSave(); renderFloorUI();
+    if (!T3.whole) setWhole(true); else { build3D(); renderHouse(); }
+    toast(`Dach auf „${topF.name}“ gesetzt – du siehst das ganze Haus.`);
+  });
+}
+function renderRoofProps(box) {
+  const R = state.world.roof, rf = roofFloor();
+  box.innerHTML = `<h3>Dach <span class="thin">${esc(ROOF_TYPES[R.type])}</span></h3>
+    <div class="kv"><span>Auf Ebene</span><b>${esc(rf?.name || '–')}</b></div>
+    <div class="kv"><span>Deckung</span><b>${esc(texDef('roof', R.spec.tex).name)}</b></div>
+    ${R.type !== 'flach' ? `<div class="kv"><span>Neigung</span><b>${R.pitch}°</b></div>` : ''}
+    <div class="btnrow" style="margin-top:12px"><button class="btn small" id="p-roofedit">Dach bearbeiten</button></div>`;
+  $('#p-roofedit').addEventListener('click', showHouseBox);
 }
 function renderWallProps(box, s) {
   const w = T3.wallMap.get(s.key); if (!w) { box.innerHTML = ''; return; }
   const f = F(), res = resolveSide(f, w, s.side), roomId = w[s.side];
-  const viaTxt = { own: '', room: '(vom Raum)', ext: '(alle Außenseiten)', default: '(Standard)' }[res.via];
+  const viaTxt = { own: '', room: '(vom Raum)', ext: '(alle Außenseiten dieser Ebene)', facade: '(Fassade)', default: '(Standard)' }[res.via];
   const ops = T3.placements.get(w.key) || [];
   box.innerHTML = `<h3>Wand</h3>
     <div class="field"><label for="p-name">Name</label><input type="text" id="p-name" placeholder="${esc(defaultWallName(w))}" value="${esc(wallName(f, w))}"></div>
@@ -2201,7 +2640,7 @@ function renderFloorProps(box, s) {
     <div class="row"><button class="btn small" id="p-reset" ${r.floor ? '' : 'disabled'}>Standard verwenden</button></div>
     <div class="field" style="margin-top:14px"><label>Alle Wände in diesem Raum ${r.wallSpec ? '' : '(Standard)'}</label><div id="p-walls"></div></div>
     <div class="btnrow"><button class="btn small" id="p-apply">Auf alle Wände anwenden</button><button class="btn small" id="p-wreset" ${r.wallSpec ? '' : 'disabled'}>Standard</button></div>`;
-  bindText($('#p-name'), v => { r.name = v; }, () => { const el = T3.labelEls.get(r.id); if (el) el.textContent = r.name; renderRooms3d(); });
+  bindText($('#p-name'), v => { r.name = v; }, () => { const el = T3.labelEls.get(r.id); if (el) el.innerHTML = labelHTML(r); renderRooms3d(); });
   $('#p-floor').append(texPicker('floor', r.floor || state.defaults.floor, spec => { checkpoint(); r.floor = spec; rebuildAfterEdit(); }));
   $('#p-reset').addEventListener('click', () => { checkpoint(); r.floor = null; rebuildAfterEdit(); });
   const wp = texPicker('wall', r.wallSpec || state.defaults.wall); $('#p-walls').append(wp);
@@ -2305,9 +2744,8 @@ function buildToolbars() {
   document.querySelectorAll('[data-tool3d]').forEach(b => b.addEventListener('click', () => {
     const t = b.dataset.tool3d;
     if (t === 'walk' && T3.walk.active) { stopWalk(); return; }
-    if (t === 'furniture') T3.sel = null;
+    if (t === 'furniture') { showCatalog(); return; }
     setTool3d(t);
-    if (t === 'furniture') applyHighlight();
   }));
   document.querySelectorAll('[data-sheet]').forEach(b => b.addEventListener('click', () => openSheet(b.dataset.sheet)));
   $('#m-go3d').addEventListener('click', () => setMode('3d'));
@@ -2338,14 +2776,15 @@ function setMode(m) {
     if (T3.cut != null && T3.cut >= F().wallHeight) T3.cut = null;
     syncCutSlider();
     if (!T3.renderer) init3D();
-    resize3D(); build3D(); syncTools3d();
+    resize3D(); build3D(); syncTools3d(); renderCatalog(); renderHouse(); renderFloorUI();
     if (T3.unplaced.length) toast(`${T3.unplaced.length} Tür(en)/Fenster fanden keine passende Wand – siehe Eigenschaften.`, 'error');
   }
 }
 function afterStateReplaced() {
   if (P.sel && !rooms().some(r => r.id === P.sel)) P.sel = null;
   scheduleSave(); renderDefaults(); renderFloorUI(); renderPlanPanels(); requestPlanDraw(); updateUndoButtons(); updateStatus();
-  if (mode === '3d') { if (!state.floors.some(f => f.rooms.length)) setMode('plan'); else { syncCutSlider(); build3D(); syncTools3d(); } }
+  fixRoofFlags(state);
+  if (mode === '3d') { if (!state.floors.some(f => f.rooms.length)) setMode('plan'); else { syncCutSlider(); build3D(); syncTools3d(); renderHouse(); } }
 }
 
 function initUI() {
@@ -2366,6 +2805,11 @@ function initUI() {
   $('#floor-add-copy').addEventListener('click', () => addFloor(true));
   $('#floor-add-empty').addEventListener('click', () => addFloor(false));
   $('#floor-del').addEventListener('click', deleteFloor);
+  $('#floor-kind').addEventListener('change', e => {
+    const f = F(); if (f !== state.floors[state.floors.length - 1]) { renderFloorUI(); return; }
+    checkpoint(); f.roof = e.target.value === 'roof'; scheduleSave(); renderFloorUI();
+    toast(f.roof ? `„${f.name}“ ist jetzt das Dachgeschoss – in der 3D-Ansicht unter „Ganzes Haus“ siehst du das Dach.` : 'Kein Dach mehr.');
+  });
   $('#def-height').addEventListener('change', e => {
     const v = parseFloat(String(e.target.value).replace(',', '.'));
     if (!isFinite(v) || v < 2 || v > 5) { toast('Wandhöhe zwischen 2 und 5 m.', 'error'); e.target.value = F().wallHeight; return; }
@@ -2421,7 +2865,7 @@ function initUI() {
     $('#cut-val').textContent = T3.cut == null ? 'aus' : `bei ${fmtM(T3.cut)}`;
     if (!cutQueued) { cutQueued = true; requestAnimationFrame(() => { cutQueued = false; if (mode === '3d') build3D(); }); }
   });
-  $('#show-labels').addEventListener('change', e => { T3.showLabels = e.target.checked; T3.labelEls.forEach(el => { el.style.display = T3.showLabels && !T3.walk.active ? '' : 'none'; }); });
+  $('#show-labels').addEventListener('change', e => { T3.showLabels = e.target.checked; T3.labelEls.forEach(el => { if (el._obj) el._obj.visible = labelsVisible(); }); });
   $('#fit-3d').addEventListener('click', () => { if (T3.walk.active) stopWalk(); fitCamera(); closeSheets(); });
   $('#walk-stop').addEventListener('click', stopWalk);
   $('#backdrop').addEventListener('click', closeSheets);
