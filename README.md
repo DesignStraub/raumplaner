@@ -1,6 +1,8 @@
 # Raumplaner
 
-Eine kleine Web-App zum Einrichten von Häusern und Wohnungen – direkt im Browser, auch auf dem Handy.
+Eine kleine Web-App zum Einrichten von Häusern und Wohnungen – direkt im Browser, auch auf dem Handy. Kostenlos, ohne Anmeldung und **Open Source**: jeder kann mitbauen.
+
+Ein Projekt von **OneHumanity Labs** – *One Planet, One Humanity*.
 
 **Live:** https://designstraub.github.io/raumplaner/
 
@@ -22,3 +24,7 @@ python3 -m http.server 8765
 ```
 
 Dann http://localhost:8765 öffnen. Es wird nur `index.html` benötigt; [three.js](https://threejs.org) wird vom CDN geladen.
+
+## Mitbauen
+
+Der Raumplaner ist Open Source unter der [MIT-Lizenz](LICENSE). Fehler melden, Ideen einbringen, Möbel ergänzen oder neue Funktionen bauen – wie das geht, steht in [CONTRIBUTING.md](CONTRIBUTING.md).
