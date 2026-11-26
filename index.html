@@ -419,7 +419,7 @@ body.booting>header,body.booting>main{animation:appIn 1.25s cubic-bezier(.2,.8,.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -699,11 +699,38 @@ const ENV_TEX = { grass: { name: 'Wiese', color: '#24301f', size: 6, draw: D.gra
 const texDefs = kind => kind === 'wall' ? WALL_TEX : kind === 'env' ? ENV_TEX : kind === 'roof' ? ROOF_TEX : FLOOR_TEX;
 const texDef = (kind, key) => texDefs(kind)[key] || texDefs(kind).farbe;
 const canvasCache = new Map(), materialCache = new Map();
+// Texturen: am Rechner 1024 px (Muster wird skaliert gemalt + feine Körnung in voller Auflösung), am Handy 512 px
+const BUMP_K = 1.0;
+const TEX_RES = () => isMobile() ? 512 : 1024;
+// Relief-Stärke je Textur (0 = glatt); bei Ziegelmauern ist der Mörtel hell, liegt aber tiefer → umgekehrt
+const BUMP = { wall: { putz: 0.7, ziegel: 1.8, beton: 0.8, holz: 1.1, fliesen: 1.2, tapete: 0.25 }, floor: { parkett: 1.1, laminat: 0.9, fliesen: 1.2, teppich: 1.0, beton: 0.8, marmor: 0.3 },
+  roof: { ziegel: 2.2, anthrazit: 2.2, schiefer: 1.8, blech: 1.4, gruen: 1.4, kies: 1.8 }, env: { grass: 1.4, lawn: 1.4 } };
+const BUMP_INV = { wall: { ziegel: true } };
 function getTexCanvas(kind, key, color) {
   const k = `${kind}|${key}|${color}`;
   let c = canvasCache.get(k);
-  if (!c) { const def = texDef(kind, key); c = document.createElement('canvas'); c.width = c.height = 512; def.draw(c.getContext('2d'), 512, color, def); canvasCache.set(k, c); }
+  if (!c) {
+    const def = texDef(kind, key), TS = TEX_RES(), x = (c = document.createElement('canvas')).getContext('2d');
+    c.width = c.height = TS; x.setTransform(TS / 512, 0, 0, TS / 512, 0, 0); def.draw(x, 512, color, def); x.setTransform(1, 0, 0, 1, 0, 0);
+    if (def.draw !== D.plain && TS > 512) speckle(x, TS, color, TS * TS / 14, 0.6, 0.07, 997 + key.length);
+    canvasCache.set(k, c);
+  }
   return c;
+}
+// Höhenbild aus der Helligkeit (gespreizt auf den vollen Bereich, leicht weichgezeichnet gegen Flimmern)
+function getBumpCanvas(kind, key, color) {
+  const k = `${kind}|${key}|${color}|bump`;
+  let c = canvasCache.get(k); if (c) return c;
+  const src = getTexCanvas(kind, key, color), S = src.width;
+  c = document.createElement('canvas'); c.width = c.height = S; const x = c.getContext('2d');
+  x.filter = 'blur(0.6px)'; x.drawImage(src, 0, 0); x.filter = 'none';
+  const img = x.getImageData(0, 0, S, S), d = img.data, n = S * S, L = new Float32Array(n), hist = new Uint32Array(256);
+  for (let i = 0; i < n; i++) { const v = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]; L[i] = v; hist[v | 0]++; }
+  let lo = 0, hi = 255, acc = 0; for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc > n * 0.02) { lo = v; break; } }
+  acc = 0; for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc > n * 0.02) { hi = v; break; } }
+  const inv = !!BUMP_INV[kind]?.[key], sc = 255 / Math.max(8, hi - lo);
+  for (let i = 0; i < n; i++) { let v = clamp((L[i] - lo) * sc, 0, 255); if (inv) v = 255 - v; d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255; }
+  x.putImageData(img, 0, 0); canvasCache.set(k, c); return c;
 }
 function getMaterial(kind, spec) {
   const tex = texDefs(kind)[spec?.tex] ? spec.tex : 'farbe';
@@ -716,6 +743,8 @@ function getMaterial(kind, spec) {
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1 / def.size, 1 / def.size);
     t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
     m = new THREE.MeshStandardMaterial({ map: t, roughness: def.rough ?? 0.9, metalness: 0, side: kind === 'floor' || kind === 'roof' ? THREE.DoubleSide : THREE.FrontSide });
+    const bs = BUMP[kind]?.[tex] || 0;
+    if (bs) { const b = new THREE.CanvasTexture(getBumpCanvas(kind, tex, color)); b.wrapS = b.wrapT = THREE.RepeatWrapping; b.repeat.copy(t.repeat); b.anisotropy = 8; m.bumpMap = b; m.bumpScale = bs * BUMP_K; }
     if (kind === 'env') holeShader(m);
     materialCache.set(k, m);
   }
@@ -2159,7 +2188,7 @@ function init3D() {
   T3.lights = { hemi, fill, room };
   T3.lamps = [0, 1, 2, 3, 4, 5].map(i => { const l = new THREE.PointLight(0xffc37a, 0, i < 2 ? 18 : 22, 1.6); scene.add(l); return l; });
   const sun = new THREE.DirectionalLight(0xfff1dc, 2.5);
-  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
+  sun.castShadow = true; sun.shadow.mapSize.set(isMobile() ? 2048 : 4096, isMobile() ? 2048 : 4096); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
   scene.add(sun); scene.add(sun.target);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), getMaterial('env', { tex: 'grass', color: ENV_TEX.grass.color }));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.02; ground.receiveShadow = true; ground.userData = { kind: 'ground' };
@@ -2189,7 +2218,7 @@ function init3D() {
   const vignette = new ShaderPass({
     uniforms: { tDiffuse: { value: null }, amount: { value: 0.32 } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: 'uniform sampler2D tDiffuse; uniform float amount; varying vec2 vUv; void main(){ vec4 c = texture2D(tDiffuse, vUv); vec2 d = (vUv - 0.5) * vec2(1.0, 0.85); c.rgb *= 1.0 - amount * smoothstep(0.25, 0.75, length(d)); gl_FragColor = c; }',
+    fragmentShader: 'uniform sampler2D tDiffuse; uniform float amount; varying vec2 vUv; void main(){ vec4 c = texture2D(tDiffuse, vUv); vec2 d = (vUv - 0.5) * vec2(1.0, 0.85); c.rgb *= 1.0 - amount * smoothstep(0.25, 0.75, length(d)); float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722)); c.rgb = max(mix(vec3(l), c.rgb, 1.1), 0.0); gl_FragColor = c; }',
   });
   composer.addPass(vignette); composer.addPass(new OutputPass());
   Object.assign(T3, { composer, bloom, vignette });
@@ -2403,7 +2432,7 @@ function buildFloor(floor, idx, active) {
 }
 // Baugrube: Erdwände außen am Keller, vom Gelände bis zur Kellersohle
 function buildPit(walls, group, top) {
-  const T = state.wallThickness / 2 + 0.01, soil = envMat('soil', () => new THREE.MeshStandardMaterial({ map: getMaterial('roof', { tex: 'kies', color: '#5a4636' }).map, roughness: 1, side: THREE.DoubleSide }));
+  const T = state.wallThickness / 2 + 0.03, soil = envMat('soil', () => new THREE.MeshStandardMaterial({ map: getMaterial('roof', { tex: 'kies', color: '#5a4636' }).map, roughness: 1, side: THREE.DoubleSide }));
   const b = makeBatch();
   for (const w of walls) {
     if (w.L && w.R) continue;
@@ -2728,7 +2757,7 @@ function lightPool(parent, lx, lz, r, x0, x1, z0, z1, y) {
 function addLantern(x, z, parent) {
   const night = state.world.night;
   const pole = plainMat('#24262a', { roughness: 0.6, metalness: 0.4 });
-  const head = plainMat(night ? '#fff1d0' : '#d9d6cf', { roughness: 0.4, emissive: night ? '#ffc879' : '#000000', emissiveIntensity: night ? 2.2 : 0 });
+  const head = plainMat(night ? '#fff1d0' : '#d9d6cf', { roughness: 0.4, emissive: night ? '#ffc879' : '#000000', emissiveIntensity: night ? 1.3 : 0 });
   const p = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 3.4, 10), pole); p.position.set(x, 1.7, z); p.castShadow = true; parent.add(p);
   const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.18, 0.12, 12), pole); cap.position.set(x, 3.52, z); parent.add(cap);
   const h = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.12, 0.34, 12), head); h.position.set(x, 3.3, z); parent.add(h);
@@ -2757,6 +2786,32 @@ function houseBBox() {
 function autoPlot(m = state.world.garden) { const b = houseBBox(); return [[b.x0 - m, b.z0 - m], [b.x1 + m, b.z0 - m], [b.x1 + m, b.z1 + m], [b.x0 - m, b.z1 + m]].map(q => q.map(r3)); }
 const plotPoly = () => state.world.plot || autoPlot();
 function polyBBox(pts) { let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity; for (const q of pts) { x0 = Math.min(x0, q[0]); z0 = Math.min(z0, q[1]); x1 = Math.max(x1, q[0]); z1 = Math.max(z1, q[1]); } return { x0, z0, x1, z1, w: x1 - x0, d: z1 - z0 }; }
+// Laub: verbeulte, glatt schattierte Kugeln mit Blatt-Textur (statt kantiger Low-Poly-Kugeln)
+const leafGeos = new Map();
+function leafGeo(i, detail = 3) {
+  if (!leafGeos.has(detail)) leafGeos.set(detail, [0, 1, 2, 3].map(k => {
+    let g = new THREE.IcosahedronGeometry(1, detail); g.deleteAttribute('normal'); g.deleteAttribute('uv'); g = mergeVertices(g);
+    const p = g.attributes.position, R = mulberry32(500 + k), ph = [R() * 6, R() * 6, R() * 6];
+    for (let j = 0; j < p.count; j++) {
+      const x = p.getX(j), y = p.getY(j), z = p.getZ(j), d = 1 + 0.09 * Math.sin(x * 3.1 + ph[0]) * Math.cos(y * 2.7 + ph[1]) + 0.07 * Math.sin(z * 3.7 + ph[2] + x * 1.3) + (R() - 0.5) * 0.06;
+      p.setXYZ(j, x * d, y * d, z * d);
+    }
+    const uv = new Float32Array(p.count * 2);
+    for (let j = 0; j < p.count; j++) { const x = p.getX(j), y = p.getY(j), z = p.getZ(j), r = Math.hypot(x, y, z) || 1; uv[j * 2] = (Math.atan2(z, x) / (Math.PI * 2) + 0.5) * 3; uv[j * 2 + 1] = (Math.asin(clamp(y / r, -1, 1)) / Math.PI + 0.5) * 2; }
+    g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.computeVertexNormals(); return g;
+  }));
+  return leafGeos.get(detail)[((i % 4) + 4) % 4];
+}
+const leafTex = () => envTex('leaves', 512, 512, (x, w) => {
+  x.fillStyle = '#8a8a8a'; x.fillRect(0, 0, w, w); const R = mulberry32(606);
+  for (let i = 0; i < 2600; i++) {
+    const px = R() * w, py = R() * w, l = 70 + R() * 130 | 0, rx = 3 + R() * 6, ry = rx * (0.35 + R() * 0.25), a = R() * Math.PI;
+    for (const dx of [-w, 0, w]) for (const dy of [-w, 0, w]) { if (px + dx < -12 || px + dx > w + 12 || py + dy < -12 || py + dy > w + 12) continue; x.fillStyle = `rgb(${l},${l},${l})`; x.beginPath(); x.ellipse(px + dx, py + dy, rx, ry, a, 0, Math.PI * 2); x.fill(); }
+  }
+}, [1, 1]);
+function leafMat(color) {
+  return envMat('leaf|' + color, () => new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(1.9), map: leafTex(), bumpMap: leafTex(), bumpScale: 2.5, roughness: 0.82 }));
+}
 function buildEnvironment() {
   const bb = allBBox(), W = state.world, plot = plotPoly(), pb = polyBBox(plot);
   const key = [bb.x0, bb.z0, bb.x1, bb.z1].map(v => v.toFixed(1)).join() + `|${W.env}|${W.night}|${W.hedge}|${JSON.stringify(plot)}|${JSON.stringify(state.garden)}`;
@@ -2772,7 +2827,7 @@ function buildEnvironment() {
   const lawn = new THREE.Mesh(floorGeometry(plot), getMaterial('env', { tex: 'lawn', color: nightCol(ENV_TEX.lawn.color) }));
   lawn.position.y = -0.01; lawn.receiveShadow = true; lawn.raycast = () => {}; T3.env.add(lawn);
   if (city) flat(pw, pd, envMat('plotpave|' + night, () => holeMat(new THREE.MeshStandardMaterial({ color: nightCol('#8f8b84'), roughness: 1 }))), cx, cz, -0.02);
-  const leafMats = ['#1f3a28', '#24432c', '#2b4a30', '#1b3324', '#30502f'].map(c => plainMat(nightCol(c), { roughness: 1, flatShading: true }));
+  const leafMats = ['#1f3a28', '#24432c', '#2b4a30', '#1b3324', '#30502f'].map(c => leafMat(nightCol(c)));
   const ball = new THREE.IcosahedronGeometry(1, 0), cone = new THREE.ConeGeometry(1, 1, 7), trunk = new THREE.CylinderGeometry(0.12, 0.18, 1, 6);
   // Zugang: eigener Weg oder automatischer Weg vom Haus zur Grundstücksgrenze
   const userPaths = state.garden.filter(g => g.type === 'path');
@@ -2803,7 +2858,7 @@ function buildEnvironment() {
       const t = (k + 0.3 + R() * 0.4) / nb * L, x = a[0] + u[0] * t + n[0] * 0.7, z = a[1] + u[1] * t + n[1] * 0.7;
       if (gate && Math.hypot(x - gate[0], z - gate[1]) < 1.8) continue;
       if (userPaths.some(g => distToPolyline([x, z], g.pts) < g.width / 2 + 0.6)) continue;
-      const s = 0.35 + R() * 0.35; add(ball, leafMats[Math.floor(R() * 5)], x, s * 0.6, z, s * 1.3, s, s * 1.3);
+      const s = 0.35 + R() * 0.35, o = add(leafGeo(k), leafMats[Math.floor(R() * 5)], x, s * 0.6, z, s * 1.3, s, s * 1.3); o.rotation.y = R() * 6;
     }
   });
   buildGarden(T3.env, leafMats);
@@ -2819,7 +2874,7 @@ function buildEnvironment() {
       const s = 0.8 + R() * 0.9, mat = leafMats[Math.floor(R() * leafMats.length)];
       add(trunk, trunkMat, x, 0.6 * s, z, s, 1.2 * s, s);
       if (R() < 0.55) { add(cone, mat, x, 2.8 * s, z, 1.4 * s, 3.4 * s, 1.4 * s); add(cone, mat, x, 4.0 * s, z, 1.0 * s, 2.4 * s, 1.0 * s); }
-      else { const o = add(ball, mat, x, 2.5 * s, z, 1.6 * s, 1.5 * s, 1.6 * s); o.rotation.y = R() * 3; }
+      else { const o = add(leafGeo(i), mat, x, 2.5 * s, z, 1.6 * s, 1.5 * s, 1.6 * s); o.rotation.y = R() * 3; o.castShadow = true; }
     }
     const rockMat = plainMat(nightCol('#4a4e52'), { roughness: 1, flatShading: true });
     for (let i = 0; i < 14; i++) {
@@ -2857,21 +2912,45 @@ function gardenMat(key) {
     default: return plainMat(c(key));
   }
 }
+// Weg als ein durchgehendes Band (Gehrung an den Knicken) – keine überlappenden Teile, also kein Flimmern
+function ribbonGeo(pts, w, y0, y1) {
+  pts = pts.filter((q, i) => !i || Math.hypot(q[0] - pts[i - 1][0], q[1] - pts[i - 1][1]) > 0.01); const n = pts.length; if (n < 2) return null;
+  const hw = w / 2, nz = v => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; }, Lp = [], Rp = [];
+  for (let i = 0; i < n; i++) {
+    const p = pts[i], d0 = i > 0 ? nz([p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]]) : null, d1 = i < n - 1 ? nz([pts[i + 1][0] - p[0], pts[i + 1][1] - p[1]]) : null;
+    const t = d0 && d1 ? nz([d0[0] + d1[0], d0[1] + d1[1]]) : (d0 || d1), m = [-t[1], t[0]];
+    const k = d0 && d1 ? 1 / Math.max(0.35, m[0] * -d1[1] + m[1] * d1[0]) : 1;
+    Lp.push([p[0] + m[0] * hw * k, p[1] + m[1] * hw * k]); Rp.push([p[0] - m[0] * hw * k, p[1] - m[1] * hw * k]);
+  }
+  const pos = [], nor = [];
+  const tri = (a, b, c, want) => {
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nzz = ux * vy - uy * vx;
+    if (nx * want[0] + ny * want[1] + nzz * want[2] < 0) { [b, c] = [c, b]; nx = -nx; ny = -ny; nzz = -nzz; }
+    const l = Math.hypot(nx, ny, nzz) || 1; pos.push(...a, ...b, ...c); for (let i = 0; i < 3; i++) nor.push(nx / l, ny / l, nzz / l);
+  };
+  const quad = (a, b, c, d, want) => { tri(a, b, c, want); tri(a, c, d, want); };
+  const P3 = (q, y) => [q[0], y, q[1]];
+  for (let i = 0; i < n - 1; i++) {
+    quad(P3(Lp[i], y1), P3(Rp[i], y1), P3(Rp[i + 1], y1), P3(Lp[i + 1], y1), [0, 1, 0]);
+    for (const [S, sg] of [[Lp, 1], [Rp, -1]]) { const a = S[i], b = S[i + 1], dx = b[0] - a[0], dz = b[1] - a[1]; quad(P3(a, y1), P3(b, y1), P3(b, y0), P3(a, y0), [-dz * sg, 0, dx * sg]); }
+  }
+  for (const [i, j] of [[0, 1], [n - 1, n - 2]]) { const out = [pts[i][0] - pts[j][0], 0, pts[i][1] - pts[j][1]]; quad(P3(Lp[i], y1), P3(Rp[i], y1), P3(Rp[i], y0), P3(Lp[i], y0), out); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(pos.length / 3 * 2), 2));
+  return g;
+}
 function buildGarden(parent, leafMats) {
   const solid = makeBatch(), flatB = makeBatch(), night = state.world.night;
-  const put = (batch, mat, g) => batch.add(mat, worldUV(g));
+  const put = (batch, mat, g, swap) => { worldUV(g); if (swap) { const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getY(i), uv.getX(i)); } return batch.add(mat, g); };
   const leaf = i => leafMats[i % leafMats.length];
   const flowerCols = ['#e8508a', '#f4c430', '#a05ad6', '#ffffff', '#ff7a45', '#5a8dee'].map(x => night ? shadeHex(x, -0.5) : x);
-  const ico = (r, x, y, z, sy = 1) => { const g = new THREE.IcosahedronGeometry(r, 0); g.scale(1, sy, 1); g.translate(x, y, z); return g; };
+  let lk = 0;
+  const ico = (r, x, y, z, sy = 1) => { const g = r > 0.1 ? leafGeo(lk++, r > 0.6 ? 3 : 2).clone() : new THREE.IcosahedronGeometry(1, 1); g.scale(r, r * sy, r); g.rotateY(lk * 1.7); g.translate(x, y, z); return g; };
   for (const el of state.garden) {
     const R = mulberry32(strHash(el.id));
     if (el.type === 'path') {
-      const mat = gardenMat(el.mat), w = el.width, H = 0.04, y = 0.012;
-      for (let i = 0; i < el.pts.length - 1; i++) {
-        const a = el.pts[i], b = el.pts[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 0.01) continue;
-        const g = new THREE.BoxGeometry(L, H, w); g.rotateY(-Math.atan2(b[1] - a[1], b[0] - a[0])); g.translate((a[0] + b[0]) / 2, y, (a[1] + b[1]) / 2); put(flatB, mat, g);
-      }
-      for (let i = 1; i < el.pts.length - 1; i++) { const g = new THREE.CylinderGeometry(w / 2, w / 2, H, 28); g.translate(el.pts[i][0], y, el.pts[i][1]); put(flatB, mat, g); }
+      const g = ribbonGeo(el.pts, el.width, -0.012, 0.032); if (g) put(flatB, gardenMat(el.mat), g);
       continue;
     }
     if (el.type === 'tree' || el.type === 'bush') {
@@ -2893,7 +2972,7 @@ function buildGarden(parent, leafMats) {
     // Rechteck-Elemente im lokalen System (Mitte, Drehung), dann in die Welt
     const c = Math.cos(el.rot), sn = Math.sin(el.rot), hw = el.w / 2, hd = el.d / 2;
     const toW = (lx, lz) => [el.x + lx * c - lz * sn, el.y + lx * sn + lz * c];
-    const box = (batch, mat, sx, sy, sz, lx, ly, lz) => { const g = new THREE.BoxGeometry(sx, sy, sz); g.rotateY(-el.rot); const [wx, wz] = toW(lx, lz); g.translate(wx, ly, wz); put(batch, mat, g); };
+    const box = (batch, mat, sx, sy, sz, lx, ly, lz, swap) => { const g = new THREE.BoxGeometry(sx, sy, sz); g.rotateY(-el.rot); const [wx, wz] = toW(lx, lz); g.translate(wx, ly, wz); put(batch, mat, g, swap); };
     const plants = (top, kind) => {
       const ix = Math.max(1, Math.floor(el.w / 0.45)), iz = Math.max(1, Math.floor(el.d / 0.45));
       for (let i = 0; i < ix; i++) for (let j = 0; j < iz; j++) {
@@ -2912,7 +2991,7 @@ function buildGarden(parent, leafMats) {
     } else {
       const raised = el.type === 'raised', t = raised ? 0.06 : 0.07, H = raised ? el.h : el.h + 0.04;
       const wall = raised ? gardenMat(el.mat === 'holz' ? 'brett' : el.mat) : gardenMat('stein');
-      for (const [sx, sz, lx, lz] of [[el.w, t, 0, -hd + t / 2], [el.w, t, 0, hd - t / 2], [t, el.d - 2 * t, -hw + t / 2, 0], [t, el.d - 2 * t, hw - t / 2, 0]]) box(raised ? solid : flatB, wall, sx, H, sz, lx, H / 2 - 0.01, lz);
+      for (const [sx, sz, lx, lz] of [[el.w, t, 0, -hd + t / 2], [el.w, t, 0, hd - t / 2], [t, el.d - 2 * t, -hw + t / 2, 0], [t, el.d - 2 * t, hw - t / 2, 0]]) box(raised ? solid : flatB, wall, sx, H, sz, lx, H / 2 - 0.01, lz, raised && el.mat === 'holz');
       const soilTop = raised ? H - 0.06 : el.h;
       box(flatB, gardenMat('erde'), el.w - 2 * t, soilTop, el.d - 2 * t, 0, soilTop / 2 - 0.01, 0);
       plants(soilTop, raised ? (el.mat === 'corten' ? 'stauden' : 'gemuese') : el.mat);
@@ -3138,17 +3217,37 @@ function buildCity({ px0, px1, pz0, pz1, cx, cz, night, R, lights }) {
   }
   T3.scene.fog.near = 60; T3.scene.fog.far = night ? 260 : 330;
 }
+// Umgebungslicht + Spiegelungen: kleine Himmelsszene (Verlauf + Sonne bzw. Stadtlichter) → PMREM
+function updateEnvMap() {
+  const n = state.world.night, city = state.world.env === 'city', key = `${n}|${city}`;
+  if (T3.envMapKey === key) return; T3.envMapKey = key;
+  if (!T3.pmrem) T3.pmrem = new THREE.PMREMGenerator(T3.renderer);
+  const sc = new THREE.Scene(), c = document.createElement('canvas'); c.width = 4; c.height = 256;
+  const x = c.getContext('2d'), gr = x.createLinearGradient(0, 0, 0, 256);
+  const stops = n ? (city ? [[0, '#04050b'], [0.42, '#121830'], [0.49, '#4a3a40'], [0.52, '#0c0d11'], [1, '#040405']] : [[0, '#02030a'], [0.42, '#0b1224'], [0.49, '#1c2538'], [0.52, '#06080a'], [1, '#020304']])
+    : [[0, '#5d7fae'], [0.4, '#a9c2df'], [0.49, '#e6ecf2'], [0.52, '#7c8574'], [1, '#3b4136']];
+  stops.forEach(([t, col]) => gr.addColorStop(t, col)); x.fillStyle = gr; x.fillRect(0, 0, 4, 256);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  sc.add(new THREE.Mesh(new THREE.SphereGeometry(10, 48, 24), new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide })));
+  const glow = (col, x0, y0, z0, r) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 8), new THREE.MeshBasicMaterial({ color: col })); m.position.set(x0, y0, z0); sc.add(m); };
+  if (!n) glow(new THREE.Color(14, 12.5, 10), 5.2, 6.5, 3.8, 0.55); // Sonne (passend zur Sonnenrichtung)
+  else { const R = mulberry32(9); for (let i = 0; i < (city ? 26 : 6); i++) { const a = R() * 6.28; glow(new THREE.Color(2.2, 1.5, 0.8).multiplyScalar(city ? 1 : 0.5), Math.cos(a) * 9, 0.2 + R() * 1.6, Math.sin(a) * 9, 0.25 + R() * 0.3); } }
+  const rt = T3.pmrem.fromScene(sc, 0.02);
+  T3.envRT?.dispose(); T3.envRT = rt; T3.scene.environment = rt.texture;
+  sc.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } }); tex.dispose();
+}
 function applyTimeOfDay() {
   const n = state.world.night, city = state.world.env === 'city', L = T3.lights;
   T3.scene.background = n ? (city ? T3.skyNightCity : T3.skyNight) : T3.skyDay;
   T3.scene.fog.color.set(n ? (city ? '#151826' : '#0a1020') : '#2c3746');
-  L.hemi.color.set(n ? '#6a7ca6' : '#d6e0ee'); L.hemi.groundColor.set(n ? '#151a16' : '#3a4636'); L.hemi.intensity = n ? 1.0 : 1.7;
+  L.hemi.color.set(n ? '#6a7ca6' : '#d6e0ee'); L.hemi.groundColor.set(n ? '#151a16' : '#3a4636'); L.hemi.intensity = n ? 0.55 : 0.75;
+  updateEnvMap();
   T3.sun.color.set(n ? '#b8c6ff' : '#fff1dc'); T3.sun.intensity = n ? 0.6 : 2.5;
   L.fill.intensity = n ? 0.7 : 0;
   T3.stars.visible = n; T3.stars.material.opacity = city ? 0.35 : 0.85;
   GLASS_MAT.emissive.set(n ? '#ffcf87' : '#000000'); GLASS_MAT.emissiveIntensity = n ? 0.7 : 0;
-  if (T3.bloom) { T3.bloom.strength = n ? 0.7 : 0.18; T3.bloom.threshold = n ? 0.85 : 1.15; T3.bloom.radius = n ? 0.6 : 0.4; T3.vignette.uniforms.amount.value = n ? 0.45 : 0.3; }
-  T3.renderer.toneMappingExposure = n ? 1.3 : 1.25;
+  if (T3.bloom) { T3.bloom.strength = n ? 0.55 : 0.18; T3.bloom.threshold = n ? 0.85 : 1.15; T3.bloom.radius = n ? 0.6 : 0.4; T3.vignette.uniforms.amount.value = n ? 0.45 : 0.3; }
+  T3.renderer.toneMappingExposure = n ? 1.3 : 1.1;
 }
 
 function cameraPose() {
