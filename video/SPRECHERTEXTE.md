@@ -46,19 +46,6 @@ Bei 0:06,5 kommt der Schnitt vom Intro zum ersten Bild. Das passt gut für einen
 
 ---
 
-## Vorschlag für YouTube
+## YouTube
 
-**Titel Trailer:** Raumplaner – dein Zuhause in 3D planen, direkt im Browser (Open Source)
-
-**Titel Short:** Dein Traumhaus in 3D – kostenlos im Browser 🏡 #shorts
-
-**Beschreibung:**
-
-> Grundriss zeichnen, in 3D einrichten und durchlaufen – kostenlos, ohne Anmeldung, am Rechner, Tablet und Handy.
->
-> ▶ Jetzt ausprobieren: https://designstraub.github.io/raumplaner/
-> ⌨ Open Source (MIT) – mach mit: https://github.com/DesignStraub/raumplaner
->
-> Ein Projekt von OneHumanity Labs – One Planet, One Humanity.
-
-Untertitel liegen als `untertitel-trailer.srt` und `untertitel-short.srt` bei. Du kannst sie bei YouTube unter „Untertitel“ hochladen.
+Titel, Beschreibung mit Kapiteln, Tags und angepinnte Kommentare stehen in [YOUTUBE.md](YOUTUBE.md).

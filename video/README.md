@@ -20,6 +20,7 @@ Benötigt werden Google Chrome, Node.js und ffmpeg. Einen anderen Chrome-Pfad gi
 | `shim.js` | Virtuelle Uhr, damit jedes Bild exakt 1/30 s weiterrückt |
 | `render.mjs` | Startet Chrome, nimmt Bild für Bild auf und kodiert mit ffmpeg |
 | `SPRECHERTEXTE.md` | Texte für ElevenLabs mit Zeitmarken |
+| `YOUTUBE.md` | Titel, Beschreibung, Kapitel und Tags für den Upload |
 | `cues.json`, `*.srt` | Zeitmarken und Untertitel |
 
 Für eine schnelle Vorschau speichert `node render.mjs trailer --preview 15` nur jedes 15. Bild als JPG in `frames/`.

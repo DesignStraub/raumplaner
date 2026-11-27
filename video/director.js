@@ -231,21 +231,31 @@ const LOUNGE_POPS = [
   r => ({ id: r.uid(), type: 'pflanze', name: 'Pflanze', x: 11.55, y: 6.45, rot: 0, color: '#c8b8a6' }),
 ];
 const stripLounge = s => { const f = s.floors[0]; f.items = f.items.filter(it => !(it.x > 7 && it.y > 6)); };
-// Gehweg durchs Haus (Erdgeschoss → Treppe → Obergeschoss)
-const WALK = [[0.8, 2.3], [2.4, 2.45], [3.45, 3.3], [3.62, 4.4], [4.5, 4.52], [5.5, 4.45], [7.2, 4.45], [8.25, 4.47], [8.62, 4.65], [8.45, 5.35], [8.3, 5.5]];
+// Gehweg durchs Haus (Wohnen → Tür → Diele → Treppe → Galerie), nach Weglänge gleichmäßig abgetastet
+const WALK = [[1.4, 4.66], [2.9, 4.66], [4.35, 4.66], [4.95, 4.58], [5.6, 4.45], [7.2, 4.45], [8.3, 4.47], [8.55, 4.85], [8.2, 5.4], [7.5, 5.55]];
+const WALK_LUT = (() => { const pts = [], len = [0]; for (let i = 0; i <= 600; i++) { pts.push(spline(WALK, i / 600)); if (i) len.push(len[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); } return { pts, len, L: len[600] }; })();
+function walkAt(u) { // u = Anteil der Weglänge
+  const { pts, len, L } = WALK_LUT, d = clamp(u) * L; let i = 1; while (i < 600 && len[i] < d) i++;
+  const f = (d - len[i - 1]) / Math.max(1e-6, len[i] - len[i - 1]); return [lerp(pts[i - 1][0], pts[i][0], f), lerp(pts[i - 1][1], pts[i][1], f)];
+}
 function walkScene(rf, t0, t1, from = 0, to = 1) {
   at(t0 - 0.02, () => { const r = rf(); r.state.activeFloor = 'fEG'; r.T3.whole = false; r.T3.sel = null; r.startWalk(); r.T3.walk.__init = false; });
   during(t0 - 0.02, t1, t => {
-    const r = rf(), W2 = r.T3.walk, u = lerp(from, to, eio(seg(t, t0, t1)) * 0.92 + seg(t, t0, t1) * 0.08);
-    const p = spline(WALK, u), q = spline(WALK, Math.min(1, u + 0.035));
+    const r = rf(), W2 = r.T3.walk, s = seg(t, t0, t1);
+    // Startet schon in Bewegung, wird zum Ende hin ruhig
+    const u = lerp(from, to, 0.45 * s + 0.55 * Math.sin(s * Math.PI / 2));
+    const p = walkAt(u), q = walkAt(Math.min(1, u + 1.3 / WALK_LUT.L));
     let dx = q[0] - p[0], dz = q[1] - p[1];
     if (Math.hypot(dx, dz) < 1e-4) { dx = -Math.sin(W2.yaw); dz = -Math.cos(W2.yaw); }
     let yaw = Math.atan2(-dx, -dz);
-    const endK = sm(seg(u, 0.86, 1));
-    if (endK > 0) { const ty = Math.atan2(-(5.0 - p[0]), -(4.4 - p[1])); let d = ty - yaw; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; yaw += d * endK; }
+    // Oben an der Treppe schon auf den letzten Stufen Richtung Galerie drehen (nie frontal auf die Außenwand)
+    const turnTo = (tx, tz, k) => { if (k <= 0) return; const ty = Math.atan2(-(tx - p[0]), -(tz - p[1])); let d = ty - yaw; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; yaw += d * k; };
+    turnTo(6.0, 6.6, sm(clamp((p[0] - 7.2) / 1.0)) * (1 - sm(seg(u, 0.88, 1))));
+    turnTo(5.3, 4.7, sm(seg(u, 0.88, 1)));
     let dy = yaw - (W2.yaw ?? yaw); while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
     if (!W2.__init) { W2.__init = true; W2.yaw = yaw; W2.pitch = -0.04; dy = 0; r.T3.camera.position.y = 1.62; W2.vy = 0; W2.ground = true; W2.floor = 0; }
-    W2.yaw = (W2.yaw ?? yaw) + dy * 0.16; W2.pitch = lerp(W2.pitch || 0, u > 0.88 ? -0.32 : (u > 0.5 && u < 0.76 ? 0.12 : -0.04), 0.07);
+    const climb = p[0] > 5.4 && p[0] < 7.6 && p[1] < 5.0;
+    W2.yaw = (W2.yaw ?? yaw) + dy * 0.2; W2.pitch = lerp(W2.pitch || 0, u > 0.86 ? -0.3 : (climb ? 0.1 : -0.04), 0.06);
     r.T3.camera.position.x = p[0]; r.T3.camera.position.z = p[1];
     if (Q.has('dbg') && (t - t0) < 1.0) console.warn('walk', t.toFixed(2), u.toFixed(3), p.map(v => v.toFixed(2)).join(','), r.T3.camera.position.y.toFixed(2), W2.yaw.toFixed(2), W2.pitch.toFixed(2));
     r.setFov(PORT ? 76 : 68);
@@ -503,7 +513,7 @@ function short() {
   cue(caption('04', 'Das ganze Haus', null, ['Dach', 'Balkon', 'Garten', 'Stadt', 'Nacht']), 20.9, 25.6);
   // Begehen
   at(26.03, () => { loadState(r(), { roof: 'flach' }); r().setWhole(false); r().T3.cut = null; });
-  walkScene(r, 26.05, 31.0, 0.47, 1);
+  walkScene(r, 26.05, 31.0, 0.3, 1);
   cue(caption('05', 'Einfach durchlaufen'), 26.5, 30.6);
   // Open Source + Abspann
   ossScene(31.0, 34.2);

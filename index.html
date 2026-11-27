@@ -2422,7 +2422,7 @@ function afterPlanChange(save = true) {
    3D-ANSICHT
    ========================================================= */
 const T3 = { renderer: null, scene: null, camera: null, controls: null, labels: null, world: null, env: null, envKey: '', ground: null, sun: null, preview: null,
-  activeGroup: null, walls: [], wallMap: new Map(), wallGroups: new Map(), openingGroups: new Map(), itemGroups: new Map(), labelEls: new Map(),
+  activeGroup: null, walls: [], wallMap: new Map(), wallGroups: new Map(), openingGroups: new Map(), doors: [], itemGroups: new Map(), labelEls: new Map(),
   placements: new Map(), placementOf: new Map(), unplaced: [],
   tool: 'select', sel: null, hl: [], cut: null, showLabels: true, showLines: true, fitted: false, drag: null,
   whole: false, floorData: [], roofGroup: null, lamps: [], lights: {}, stars: null, skyDay: null, skyNight: null, skyNightCity: null, anims: [], cat: 'alle', catQuery: '',
@@ -2522,7 +2522,7 @@ function clearWorld() {
   for (const o of T3.hl) { o.parent?.remove(o); if (o.geometry) o.geometry.dispose(); }
   T3.labelEls.forEach(el => el.remove());
   disposeTree(T3.world); T3.world.clear();
-  T3.wallGroups.clear(); T3.openingGroups.clear(); T3.itemGroups.clear(); T3.labelEls.clear(); T3.hl = []; T3.floorData = [];
+  T3.wallGroups.clear(); T3.openingGroups.clear(); T3.doors = []; T3.itemGroups.clear(); T3.labelEls.clear(); T3.hl = []; T3.floorData = [];
 }
 function boxUV(g) {
   const pos = g.attributes.position, nor = g.attributes.normal, uv = g.attributes.uv;
@@ -2879,6 +2879,10 @@ function buildOpening(g, w, o, x0, x1, bottom, top, viewH, H) {
     const hingeLeft = dot2(o.hingeVec, w.u) < 0, dir = hingeLeft ? 1 : -1, swing = dot2(o.face, w.nL) >= 0 ? 1 : -1;
     const pivot = new THREE.Group(); pivot.position.set(hingeLeft ? x0 + fw : x1 - fw, bottom, 0);
     pivot.rotation.y = o.open ? -dir * swing * 1.35 : 0; og.add(pivot);
+    // Beim Begehen schwingt die Tür automatisch auf (vom Gehenden weg) und fällt danach wieder zu
+    const ws = T3.walk && T3.walk.active;
+    T3.doors.push({ pivot, o, open: ws ? 0 : (o.open ? 1 : 0), side: -dir * swing, base: -dir * swing, sgn: 0 });
+    if (ws) pivot.rotation.y = 0;
     if (lh > 0.02 && lw > 0.05) {
       const leaf = new THREE.Mesh(new THREE.BoxGeometry(lw, lh, 0.04), LEAF_MAT);
       leaf.position.set(dir * lw / 2, lh / 2, 0); leaf.castShadow = true; leaf.receiveShadow = true; pivot.add(leaf);
@@ -4011,7 +4015,7 @@ function startWalk() {
 }
 function stopWalk() {
   const W = T3.walk; if (!W.active) return;
-  W.active = false; W.keys.clear(); W.look = null; W.move = null; $('#joy').hidden = true;
+  W.active = false; W.keys.clear(); W.look = null; W.move = null; $('#joy').hidden = true; resetDoors();
   if (document.pointerLockElement) document.exitPointerLock();
   // Über die Treppe auf eine andere Ebene gelaufen → diese Ebene wird aktiv
   const changed = W.floor !== W.startFloor && state.floors[W.floor];
@@ -4090,8 +4094,27 @@ function walkTry(nx, nz, ox, oz, feet, fi) {
   if (ceilingAt(nx, nz, floorAtHeight(base)) - base < HEAD + 0.02) return false; // zu niedrig (Dachschräge)
   return true;
 }
+const _dv = new THREE.Vector3();
+function updateDoors(dt) {
+  const p = T3.camera.position;
+  for (const d of T3.doors) {
+    d.pivot.parent.getWorldPosition(_dv);
+    const dx = p.x - _dv.x, dz = p.z - _dv.z, near = Math.abs(p.y - EYE - _dv.y) < 1.2 && Math.hypot(dx, dz) < 1.9;
+    if (near && d.open < 0.02) {
+      // Seite merken, auf der man steht → Tür öffnet sich von einem weg
+      const side = dx * d.o.face[0] + dz * d.o.face[1];
+      d.sgn = side > 0 ? -1 : 1;
+    }
+    const goal = near ? 1 : 0, sp = goal ? 2.6 : 1.5;
+    d.open = goal > d.open ? Math.min(goal, d.open + dt * sp) : Math.max(goal, d.open - dt * sp);
+    const e = d.open * d.open * (3 - 2 * d.open);
+    d.pivot.rotation.y = d.base * (d.sgn || 1) * 1.4 * e;
+  }
+}
+function resetDoors() { for (const d of T3.doors) { d.open = d.o.open ? 1 : 0; d.pivot.rotation.y = d.o.open ? d.base * 1.35 : 0; } }
 function updateWalk(dt) {
   const W = T3.walk, k = W.keys;
+  updateDoors(Math.min(dt || 0, 0.1));
   let f = (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0);
   let s = (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) - (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0);
   let speed = (k.has('ShiftLeft') || k.has('ShiftRight')) ? 1.4 : 3.6; // standardmäßig rennen, Umschalt = langsam

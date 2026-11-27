@@ -27,7 +27,7 @@ window.buildDemoState = function (opts = {}) {
     const mk = (type, w, pos, width, height, sill, name, face) => {
       const nx = -w.u[1], ny = w.u[0];
       out.push({ id: uid(), type, name, x: +(w.a[0] + w.u[0] * pos).toFixed(3), y: +(w.a[1] + w.u[1] * pos).toFixed(3), dir: [...w.u], width, height, sill,
-        face: face || [nx, ny], hingeVec: [-w.u[0], -w.u[1]], open: type === 'door' && name !== 'Haustür' });
+        face: face || [nx, ny], hingeVec: [-w.u[0], -w.u[1]], open: false });
     };
     const pairKey = w => [w.L, w.R].sort().join('|');
     for (const w of walls) if (extra.some(e => e(w, mk))) { used.add(w); if (w.L && w.R) pairs.add(pairKey(w)); }
