@@ -28,16 +28,11 @@ Open Source: Jeder kann mitbauen – neue Möbel, Raumvorlagen, Funktionen oder 
 
 Kapitel
 0:00 Intro
-0:06 Raumplaner
-0:12 Grundriss zeichnen
-0:21 Ein Klick zu 3D
+0:12 Grundriss zeichnen & ab in 3D
 0:28 Einrichten: Möbel, Böden, Farben
 0:37 Das ganze Haus: Stockwerke, Dach, Balkon
-0:46 Garten, Stadt, Tag und Nacht
-0:54 Durchs Haus laufen
-1:03 Rechner, Tablet, Handy
-1:10 Open Source – mach mit
-1:19 Abspann
+0:47 Garten, Stadt – und durchs Haus laufen
+1:03 Rechner, Tablet, Handy & Open Source
 
 Ein Projekt von OneHumanity Labs – One Planet, One Humanity.
 

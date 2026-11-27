@@ -14,7 +14,7 @@ cues = json.load(open(os.path.join(here, 'cues.json')))[name]
 n = len(cues)
 
 dur = float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', src]).decode().strip())
-log = subprocess.run(['ffmpeg', '-hide_banner', '-i', src, '-af', 'silencedetect=noise=-38dB:d=0.35', '-f', 'null', '-'],
+log = subprocess.run(['ffmpeg', '-hide_banner', '-i', src, '-af', 'silencedetect=noise=-38dB:d=0.14', '-f', 'null', '-'],
                      capture_output=True, text=True).stderr
 starts = [float(x) for x in re.findall(r'silence_start: ([\d.]+)', log)]
 ends = [float(x) for x in re.findall(r'silence_end: ([\d.]+)', log)]
@@ -24,8 +24,12 @@ if len(gaps) < n - 1:
 # Schnitte so wählen, dass jede Zeile etwa so lang ist, wie ihr Text es erwarten lässt.
 # Lange Pausen werden bevorzugt (falls <break>-Marken umgesetzt wurden), sind aber nicht nötig.
 gaps.sort(key=lambda g: g[1])
-chars = [len(c['text']) for c in cues]
-speech = dur - sum(g[0] for g in gaps)
+# Sprechdauer grob schätzen: Silben (Vokalgruppen) plus kurze Pausen an Satzzeichen
+def weight(t):
+    syl = len(re.findall(r'[aeiouyäöü]+', t.lower())) + 2 * len(re.findall(r'\d', t))
+    return syl + 1.6 * len(re.findall(r'[,.:;!?…–]', t))
+chars = [weight(c['text']) for c in cues]
+speech = dur
 exp = [speech * k / sum(chars) for k in chars]
 maxgap = max(g[0] for g in gaps)
 G = len(gaps)
@@ -35,11 +39,11 @@ def seg_cost(i, a_end, b_start):  # Zeile i läuft vom Ende einer Pause bis zum 
 INF = float('inf')
 # best[i][j]: Zeilen 0..i gesetzt, Zeile i endet an Pause j
 best = [[INF] * G for _ in range(n)]; prev = [[-1] * G for _ in range(n)]
-for j in range(G): best[0][j] = seg_cost(0, 0.0, gaps[j][1]) - 0.5 * gaps[j][0] / maxgap
+for j in range(G): best[0][j] = seg_cost(0, 0.0, gaps[j][1]) - 0.1 * gaps[j][0] / maxgap
 for i in range(1, n - 1):
     for j in range(G):
         for k in range(j):
-            c = best[i - 1][k] + seg_cost(i, gaps[k][2], gaps[j][1]) - 0.5 * gaps[j][0] / maxgap
+            c = best[i - 1][k] + seg_cost(i, gaps[k][2], gaps[j][1]) - 0.1 * gaps[j][0] / maxgap
             if c < best[i][j]: best[i][j], prev[i][j] = c, k
 fin = min(range(G), key=lambda k: best[n - 2][k] + seg_cost(n - 1, gaps[k][2], dur))
 idx = [fin]
