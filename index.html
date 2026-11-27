@@ -691,6 +691,106 @@ const D = {
     }
   },
   gravel(ctx, S, c) { fill(ctx, S, c); blotches(ctx, S, c, 30, 20, 80, 0.06, 131); speckle(ctx, S, c, 30000, 2.6, 0.25, 133); },
+  // Großformatige Blocksteine (Kalksandstein / Betonstein): wenige große Steine, feine Fugen
+  block(ctx, S, c) {
+    const rows = 4, cols = 2, rh = S / rows, bw = S / cols, g = Math.max(2, S * 0.008), R = mulberry32(141);
+    fill(ctx, S, shade(c, -0.18));
+    for (let r = 0; r < rows; r++) { const off = (r % 2) * bw / 2; for (let k = -1; k <= cols; k++) {
+      const x = k * bw + off + g / 2, y = r * rh + g / 2, f = (R() * 2 - 1) * 0.05;
+      const gr = ctx.createLinearGradient(x, y, x, y + rh); gr.addColorStop(0, shade(c, f + 0.04)); gr.addColorStop(1, shade(c, f - 0.04));
+      ctx.fillStyle = gr; ctx.fillRect(x, y, bw - g, rh - g); } }
+    blotches(ctx, S, c, 30, 20, 70, 0.04, 143); speckle(ctx, S, c, 12000, 1.6, 0.12, 145);
+  },
+  // Naturstein: unregelmäßige Steine in Reihen, dunkle Fugen
+  stone(ctx, S, c) {
+    fill(ctx, S, shade(c, -0.45)); const R = mulberry32(151); let y = 0;
+    while (y < S - 1) {
+      const h = Math.min(S - y, 34 + R() * 40); let x = -R() * 60;
+      while (x < S) {
+        const w = 50 + R() * 80, f = (R() * 2 - 1) * 0.16, inset = 3 + R() * 2, rad = 8 + R() * 10;
+        for (const dx of x < 0 ? [0, S] : x + w > S ? [0, -S] : [0]) { // nahtlos kachelbar
+          ctx.fillStyle = shade(c, f); ctx.beginPath(); ctx.roundRect(x + dx + inset, y + inset, w - 2 * inset, h - 2 * inset, rad); ctx.fill();
+        }
+        x += w;
+      }
+      y += h;
+    }
+    blotches(ctx, S, c, 40, 15, 50, 0.07, 153); speckle(ctx, S, c, 14000, 1.8, 0.16, 155);
+  },
+  // Holzfassade senkrecht (Boden-Deckel-Schalung)
+  boards(ctx, S, c) {
+    const n = 8, w = S / n, R = mulberry32(161);
+    for (let i = 0; i < n; i++) {
+      ctx.fillStyle = shade(c, (R() * 2 - 1) * 0.1); ctx.fillRect(i * w, 0, w, S);
+      ctx.save(); ctx.beginPath(); ctx.rect(i * w, 0, w, S); ctx.clip();
+      for (let j = 0; j < 16; j++) { const x0 = i * w + R() * w, amp = 1 + R() * 3, k = 1 + Math.floor(R() * 3), ph = R() * 6.28;
+        ctx.strokeStyle = shadeA(c, -0.35, 0.1 + R() * 0.15); ctx.lineWidth = 0.6 + R() * 1.2; ctx.beginPath();
+        for (let y = 0; y <= S; y += 8) { const x = x0 + Math.sin(y / S * Math.PI * 2 * k + ph) * amp; y ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); }
+      ctx.restore();
+      if (i % 2) { ctx.fillStyle = shadeA(c, -0.6, 0.55); ctx.fillRect(i * w - 4, 0, 4, S); ctx.fillRect((i + 1) * w, 0, 4, S); ctx.fillStyle = shadeA(c, 0.25, 0.35); ctx.fillRect(i * w + 1, 0, 2, S); }
+    }
+  },
+  // Glasbausteine: durchscheinende Quadrate mit hellen Fugen
+  glassblock(ctx, S, c) {
+    ctx.clearRect(0, 0, S, S); const n = 4, t = S / n, g = S * 0.03;
+    ctx.fillStyle = '#e4e2dc'; ctx.fillRect(0, 0, S, S);
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      const x = i * t + g / 2, y = j * t + g / 2, s2 = t - g; ctx.clearRect(x, y, s2, s2);
+      const gr = ctx.createRadialGradient(x + s2 / 2, y + s2 / 2, s2 * 0.05, x + s2 / 2, y + s2 / 2, s2 * 0.72);
+      gr.addColorStop(0, shadeA(c, 0.5, 0.35)); gr.addColorStop(0.6, shadeA(c, 0, 0.55)); gr.addColorStop(1, shadeA(c, -0.25, 0.85));
+      ctx.fillStyle = gr; ctx.fillRect(x, y, s2, s2);
+      ctx.strokeStyle = shadeA(c, 0.6, 0.5); ctx.lineWidth = 2; ctx.strokeRect(x + 6, y + 6, s2 - 12, s2 - 12);
+    }
+  },
+  // Glaswand: klare Scheiben mit schmalen dunklen Pfosten
+  glass(ctx, S, c) {
+    ctx.clearRect(0, 0, S, S); ctx.fillStyle = shadeA(c, 0, 0.2); ctx.fillRect(0, 0, S, S);
+    const gr = ctx.createLinearGradient(0, 0, S, S); gr.addColorStop(0, 'rgba(255,255,255,0.12)'); gr.addColorStop(0.5, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(255,255,255,0.08)');
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, S, S);
+    ctx.fillStyle = '#2f3237'; for (const x of [0, S / 2]) { ctx.fillRect(x - 5, 0, 10, S); } ctx.fillRect(S - 5, 0, 5, S);
+  },
+  // Biberschwanz: schmale Ziegel mit runder Unterkante
+  beaver(ctx, S, c) {
+    const rows = 16, cols = 11, rh = S / rows, cw = S / cols, R = mulberry32(171);
+    fill(ctx, S, shade(c, -0.5));
+    for (let r = 0; r < rows; r++) { const y = r * rh, off = (r % 2) * cw / 2;
+      for (let k = -1; k <= cols; k++) { const x = k * cw + off, f = (R() * 2 - 1) * 0.1;
+        const g = ctx.createLinearGradient(0, y, 0, y + rh * 1.4); g.addColorStop(0, shade(c, f - 0.15)); g.addColorStop(0.8, shade(c, f + 0.05)); g.addColorStop(1, shade(c, f - 0.15));
+        ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x + 1, y); ctx.lineTo(x + cw - 1, y); ctx.lineTo(x + cw - 1, y + rh * 0.9);
+        ctx.arc(x + cw / 2, y + rh * 0.9, cw / 2 - 1, 0, Math.PI); ctx.closePath(); ctx.fill(); } }
+    speckle(ctx, S, c, 7000, 1.4, 0.12, 173);
+  },
+  // Holzschindeln: Reihen ungleich breiter Brettchen mit Schattenkante
+  shingle(ctx, S, c) {
+    const rows = 10, rh = S / rows, R = mulberry32(181); fill(ctx, S, shade(c, -0.5));
+    for (let r = 0; r < rows; r++) { const y = r * rh; let x = -R() * 40;
+      while (x < S) { const w = 26 + R() * 40, f = (R() * 2 - 1) * 0.16;
+        const g = ctx.createLinearGradient(0, y, 0, y + rh); g.addColorStop(0, shade(c, f - 0.2)); g.addColorStop(0.85, shade(c, f + 0.05)); g.addColorStop(1, shade(c, f - 0.3));
+        ctx.fillStyle = g; ctx.fillRect(x + 1.5, y, w - 3, rh - 1);
+        ctx.strokeStyle = shadeA(c, -0.4, 0.25); ctx.lineWidth = 0.8; for (let j = 0; j < 3; j++) { const xx = x + 4 + R() * (w - 8); ctx.beginPath(); ctx.moveTo(xx, y + 2); ctx.lineTo(xx + (R() - 0.5) * 3, y + rh - 3); ctx.stroke(); }
+        x += w; } }
+    speckle(ctx, S, c, 6000, 1.3, 0.1, 183);
+  },
+  // Solardach: dunkle Module mit Zellraster und hellen Rahmen
+  solar(ctx, S, c) {
+    fill(ctx, S, '#b9bec4'); const mc = 2, mr = 3, mw = S / mc, mh = S / mr, g = 4;
+    for (let i = 0; i < mc; i++) for (let j = 0; j < mr; j++) {
+      const x = i * mw + g, y = j * mh + g, w = mw - 2 * g, h = mh - 2 * g;
+      const gr = ctx.createLinearGradient(x, y, x + w, y + h); gr.addColorStop(0, shade(c, 0.08)); gr.addColorStop(1, shade(c, -0.12));
+      ctx.fillStyle = gr; ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = shadeA(c, 0.45, 0.45); ctx.lineWidth = 1;
+      for (let k = 1; k < 6; k++) { ctx.beginPath(); ctx.moveTo(x + w * k / 6, y); ctx.lineTo(x + w * k / 6, y + h); ctx.stroke(); }
+      for (let k = 1; k < 10; k++) { ctx.beginPath(); ctx.moveTo(x, y + h * k / 10); ctx.lineTo(x + w, y + h * k / 10); ctx.stroke(); }
+    }
+  },
+  // Reetdach: dichte, leicht schräge Halme
+  thatch(ctx, S, c) {
+    fill(ctx, S, shade(c, -0.25)); const R = mulberry32(191);
+    for (let i = 0; i < 9000; i++) { const x = R() * S, y = R() * S, l = 14 + R() * 26, a = (R() - 0.5) * 0.25;
+      ctx.strokeStyle = shadeA(c, (R() * 2 - 1) * 0.3, 0.55); ctx.lineWidth = 0.7 + R() * 1.1;
+      for (const dy of [0, -S]) { ctx.beginPath(); ctx.moveTo(x, y + dy); ctx.lineTo(x + Math.sin(a) * l, y + dy + Math.cos(a) * l); ctx.stroke(); } }
+    blotches(ctx, S, c, 30, 30, 90, 0.08, 193);
+  },
 };
 const WALL_TEX = {
   farbe:   { name: 'Glatt (nur Farbe)', color: '#f5f5f2', size: 1, draw: D.plain, rough: 0.95 },
@@ -700,6 +800,11 @@ const WALL_TEX = {
   beton:   { name: 'Sichtbeton', color: '#a9a9a4', size: 2, draw: D.concrete },
   holz:    { name: 'Holzpaneele', color: '#b27c4c', size: 1.2, draw: D.panel, rough: 0.75 },
   fliesen: { name: 'Wandfliesen', color: '#e9eff1', size: 0.6, draw: D.tiles(4), rough: 0.35 },
+  block:   { name: 'Blockstein', color: '#d8d4cb', size: 1, draw: D.block },
+  stein:   { name: 'Naturstein', color: '#a39886', size: 1.6, draw: D.stone, rough: 0.9 },
+  lattung: { name: 'Holzfassade (senkrecht)', color: '#9b7350', size: 1.2, draw: D.boards, rough: 0.8 },
+  glasbau: { name: 'Glasbausteine', color: '#9fc6d8', size: 0.8, draw: D.glassblock, rough: 0.15, alpha: true },
+  glas:    { name: 'Glas (durchsichtig)', color: '#bcd9ea', size: 2.5, draw: D.glass, rough: 0.05, alpha: true },
 };
 const FLOOR_TEX = {
   farbe:   { name: 'Glatt (nur Farbe)', color: '#8b5e3c', size: 1, draw: D.plain },
@@ -717,6 +822,10 @@ const ROOF_TEX = {
   blech:    { name: 'Blech (Stehfalz)', color: '#6f767d', size: 2.4, draw: D.seam, rough: 0.45 },
   gruen:    { name: 'Gründach', color: '#4f6b3a', size: 3, draw: D.grass },
   kies:     { name: 'Kies (Flachdach)', color: '#8f8a80', size: 1.5, draw: D.gravel },
+  biber:    { name: 'Biberschwanz', color: '#b0553a', size: 1.2, draw: D.beaver, rough: 0.8 },
+  schindel: { name: 'Holzschindeln', color: '#8a6a4a', size: 1.6, draw: D.shingle, rough: 0.85 },
+  solar:    { name: 'Solardach', color: '#1d2a44', size: 3.4, draw: D.solar, rough: 0.25 },
+  reet:     { name: 'Reet', color: '#9c8558', size: 1.2, draw: D.thatch, rough: 1 },
   farbe:    { name: 'Glatt (nur Farbe)', color: '#5a4a42', size: 1, draw: D.plain },
 };
 const ENV_TEX = { grass: { name: 'Wiese', color: '#24301f', size: 6, draw: D.grass }, lawn: { name: 'Rasen', color: '#34452a', size: 4, draw: D.grass } };
@@ -727,16 +836,16 @@ const canvasCache = new Map(), materialCache = new Map();
 const BUMP_K = 1.0;
 const TEX_RES = () => LITE ? 512 : 1024;
 // Relief-Stärke je Textur (0 = glatt); bei Ziegelmauern ist der Mörtel hell, liegt aber tiefer → umgekehrt
-const BUMP = { wall: { putz: 0.7, ziegel: 1.8, beton: 0.8, holz: 1.1, fliesen: 1.2, tapete: 0.25 }, floor: { parkett: 1.1, laminat: 0.9, fliesen: 1.2, teppich: 1.0, beton: 0.8, marmor: 0.3 },
-  roof: { ziegel: 2.2, anthrazit: 2.2, schiefer: 1.8, blech: 1.4, gruen: 1.4, kies: 1.8 }, env: { grass: 1.4, lawn: 1.4 } };
-const BUMP_INV = { wall: { ziegel: true } };
+const BUMP = { wall: { putz: 0.7, ziegel: 1.8, beton: 0.8, holz: 1.1, fliesen: 1.2, tapete: 0.25, block: 1.0, stein: 2.0, lattung: 1.2 }, floor: { parkett: 1.1, laminat: 0.9, fliesen: 1.2, teppich: 1.0, beton: 0.8, marmor: 0.3 },
+  roof: { ziegel: 2.2, anthrazit: 2.2, schiefer: 1.8, blech: 1.4, gruen: 1.4, kies: 1.8, biber: 2.0, schindel: 1.8, solar: 0.4, reet: 2.2 }, env: { grass: 1.4, lawn: 1.4 } };
+const BUMP_INV = { wall: { ziegel: true, block: true, stein: true } };
 function getTexCanvas(kind, key, color) {
   const k = `${kind}|${key}|${color}`;
   let c = canvasCache.get(k);
   if (!c) {
     const def = texDef(kind, key), TS = TEX_RES(), x = (c = document.createElement('canvas')).getContext('2d');
     c.width = c.height = TS; x.setTransform(TS / 512, 0, 0, TS / 512, 0, 0); def.draw(x, 512, color, def); x.setTransform(1, 0, 0, 1, 0, 0);
-    if (def.draw !== D.plain && TS > 512) speckle(x, TS, color, TS * TS / 14, 0.6, 0.07, 997 + key.length);
+    if (def.draw !== D.plain && !def.alpha && TS > 512) speckle(x, TS, color, TS * TS / 14, 0.6, 0.07, 997 + key.length);
     canvasCache.set(k, c);
   }
   return c;
@@ -767,6 +876,8 @@ function getMaterial(kind, spec) {
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1 / def.size, 1 / def.size);
     t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
     m = new THREE.MeshStandardMaterial({ map: t, roughness: def.rough ?? 0.9, metalness: 0, side: kind === 'floor' || kind === 'roof' ? THREE.DoubleSide : THREE.FrontSide });
+    // Glas und Glasbausteine: durchscheinend (Alpha aus der Textur), dahinter bleibt alles sichtbar
+    if (def.alpha) Object.assign(m, { transparent: true, depthWrite: false, metalness: 0.1 });
     const bs = LITE ? 0 : (BUMP[kind]?.[tex] || 0);
     if (bs) { const b = new THREE.CanvasTexture(getBumpCanvas(kind, tex, color)); b.wrapS = b.wrapT = THREE.RepeatWrapping; b.repeat.copy(t.repeat); b.anisotropy = 8; m.bumpMap = b; m.bumpScale = bs * BUMP_K; }
     if (kind === 'env') holeShader(m);
@@ -959,8 +1070,8 @@ const TEMPLATES = {
   ] },
 };
 function newFloor(name, wallHeight = 2.6) { return { id: 'f' + uid(), name, wallHeight, rooms: [], openings: [], items: [], sides: [], wallNames: [], exterior: null, roof: false, cellar: false, lines: [], balconies: [] }; }
-const ROOF_TYPES = { sattel: 'Satteldach', walm: 'Walmdach', flach: 'Flachdach' };
-function defaultWorld() { return { env: 'garden', garden: 5, plot: null, hedge: true, night: false, facade: null, roof: { type: 'sattel', pitch: 38, knee: 1.0, turn: false, spec: { tex: 'ziegel', color: ROOF_TEX.ziegel.color } } }; }
+const ROOF_TYPES = { sattel: 'Satteldach', walm: 'Walmdach', pult: 'Pultdach', flach: 'Flachdach' };
+function defaultWorld() { return { env: 'garden', garden: 5, plot: null, hedge: true, night: false, facade: null, roof: { type: 'sattel', pitch: 38, knee: 1.0, turn: false, over: 0.45, attic: false, spec: { tex: 'ziegel', color: ROOF_TEX.ziegel.color } } }; }
 function normWorld(w) {
   const d = defaultWorld(); if (!w || typeof w !== 'object') return d;
   const r = w.roof || {};
@@ -968,7 +1079,7 @@ function normWorld(w) {
   return { env: w.env === 'city' ? 'city' : 'garden', garden: clamp(isFinite(+w.garden) && w.garden !== null ? +w.garden : d.garden, 1, 30), night: !!w.night,
     plot: plot && plot.length >= 3 && isSimple(plot) ? plot : null, hedge: w.hedge !== false,
     facade: normSpec('wall', w.facade, null),
-    roof: { type: ROOF_TYPES[r.type] ? r.type : 'sattel', pitch: clamp(+r.pitch || 38, 10, 65), knee: clamp(isFinite(+r.knee) && r.knee !== null && r.knee !== '' ? +r.knee : 1.0, 0, 2.5), turn: !!r.turn, spec: normSpec('roof', r.spec, d.roof.spec) } };
+    roof: { type: ROOF_TYPES[r.type] ? r.type : 'sattel', pitch: clamp(+r.pitch || 38, 10, 65), knee: clamp(isFinite(+r.knee) && r.knee !== null && r.knee !== '' ? +r.knee : 1.0, 0, 2.5), turn: !!r.turn, over: clamp(isFinite(+r.over) && r.over !== null && r.over !== '' ? +r.over : 0.45, 0, 1.5), attic: !!r.attic, spec: normSpec('roof', r.spec, d.roof.spec) } };
 }
 // Nur die oberste Ebene darf ein Dachgeschoss sein, nur die unterste ein Keller (und nicht die einzige)
 function fixRoofFlags(s) { s.floors.forEach((f, i) => { if (i !== s.floors.length - 1 || f.cellar) f.roof = false; if (i !== 0 || s.floors.length < 2) f.cellar = false; }); }
@@ -2292,7 +2403,7 @@ function renderFloorUI() {
   const isTop = f === state.floors[state.floors.length - 1];
   $('#floor-kind').value = f.roof ? 'roof' : 'normal'; $('#floor-kind').disabled = !isTop || f.cellar;
   $('#floor-add-cellar').disabled = hasCellar();
-  $('#floor-kind-hint').textContent = f.cellar ? `Keller – liegt ${fmtM(f.wallHeight + SLAB)} unter dem Gelände. Mit einer Treppe kommst du ins Erdgeschoss.` : isTop ? (f.roof ? `Auf diese Ebene kommt das Dach (${ROOF_TYPES[state.world.roof.type]}). Form und Deckung stellst du in der 3D-Ansicht unter „Haus & Umgebung“ ein.` : 'Wähle „Dachgeschoss“, damit das Haus oben ein Dach bekommt.')
+  $('#floor-kind-hint').textContent = f.cellar ? `Keller – liegt ${fmtM(f.wallHeight + SLAB)} unter dem Gelände. Mit einer Treppe kommst du ins Erdgeschoss.` : isTop ? (f.roof ? `Auf diese Ebene kommt das Dach (${ROOF_TYPES[state.world.roof.type]}). Form und Deckung stellst du in der 3D-Ansicht unter „Haus & Umgebung“ ein.` : atticOn() ? 'Oben drauf sitzt ein Dachspeicher (Spitzboden). Einstellen kannst du ihn in der 3D-Ansicht unter „Haus & Umgebung“.' : 'Wähle „Dachgeschoss“ – oder setze in der 3D-Ansicht unter „Haus & Umgebung“ einen Dachspeicher obendrauf.')
     : 'Nur die oberste Ebene kann das Dachgeschoss sein.';
   // Schwebende Umschalter
   for (const id of ['#floorbar-plan', '#floorbar-3d']) {
@@ -2665,15 +2776,26 @@ function groupsOf(list, linked) {
 // Dachrahmen: ein Steildach je Gebäudeblock des Dachgeschosses (getrennte Blöcke bekommen getrennte Dächer)
 function roofFrame() {
   const rf = roofFloor(); if (!rf) return null;
-  const R = state.world.roof, T = state.wallThickness, idx = state.floors.indexOf(rf);
-  const shared = { rf, idx, type: R.type, base: floorBase(idx), H: rf.wallHeight, knee: R.knee, tA: Math.tan(R.pitch * Math.PI / 180) };
+  const idx = state.floors.indexOf(rf);
+  return frameFor(rf, { idx, base: floorBase(idx), H: rf.wallHeight });
+}
+// Dachspeicher (Spitzboden): Steildach direkt auf der obersten normalen Ebene, darunter ein ungenutzter Dachraum
+const atticOn = () => { const R = state.world.roof, top = state.floors[state.floors.length - 1]; return !roofFloor() && R.attic && R.type !== 'flach' && !!top && !top.cellar && top.rooms.length > 0; };
+function atticFrame() {
+  if (!atticOn()) return null;
+  const idx = state.floors.length - 1, top = state.floors[idx];
+  return frameFor(top, { idx, base: floorBase(idx) + top.wallHeight + SLAB, H: 0, attic: true });
+}
+function frameFor(rf, extra) {
+  const R = state.world.roof, T = state.wallThickness;
+  const shared = { rf, type: R.type, knee: R.knee, tA: Math.tan(R.pitch * Math.PI / 180), flip: R.type === 'pult' && R.turn ? -1 : 1, ...extra };
   const parts = groupsOf(rf.rooms, roomsTouch).map(rs => {
     // Hauptrichtung der Wände (gedrehte Häuser bekommen ein mitgedrehtes Dach)
     const ang = mainAngle(rs.flatMap(r => r.points.map((q, i) => [q, r.points[(i + 1) % r.points.length]]))), ca = Math.cos(-ang), sa = Math.sin(-ang);
     let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
     for (const r of rs) for (const q of r.points) { const p = [q[0] * ca - q[1] * sa, q[0] * sa + q[1] * ca]; x0 = Math.min(x0, p[0]); z0 = Math.min(z0, p[1]); x1 = Math.max(x1, p[0]); z1 = Math.max(z1, p[1]); }
     const X0 = x0 - T / 2, X1 = x1 + T / 2, Z0 = z0 - T / 2, Z1 = z1 + T / 2, lenX = X1 - X0, lenZ = Z1 - Z0;
-    let alongX = lenX >= lenZ; if (R.type === 'sattel' && R.turn) alongX = !alongX;
+    let alongX = lenX >= lenZ; if (R.type === 'sattel' && R.turn) alongX = !alongX; // Pultdach: „turn“ dreht die hohe Seite
     return { ...shared, rooms: rs, ang, X0, X1, Z0, Z1, cx: (X0 + X1) / 2, cz: (Z0 + Z1) / 2, alongX, Lx: (alongX ? lenX : lenZ) / 2, Wz: (alongX ? lenZ : lenX) / 2 };
   }).sort((a, b) => b.Wz - a.Wz);
   return { ...parts[0], ...shared, parts };
@@ -2701,13 +2823,20 @@ function roofUnderAt(f, x, z) {
   if (!f || f.type === 'flach') return Infinity;
   f = partFor(f, x, z); [x, z] = toRoofL(f, x, z);
   const a = f.alongX ? x - f.cx : z - f.cz, b = f.alongX ? z - f.cz : x - f.cx;
+  if (f.type === 'pult') return f.knee + (f.flip * b + f.Wz) * f.tA; // steigt von der niedrigen zur hohen Seite
   let d = f.Wz - Math.abs(b); if (f.type === 'walm') d = Math.min(d, f.Lx - Math.abs(a));
   return f.knee + d * f.tA;
 }
 // Bereich, in dem die Dachunterseite mindestens h hoch ist (achsparalleles Rechteck) oder null
 function roofRegion(f, h) {
   if (!f || f.type === 'flach') return { x0: -1e4, x1: 1e4, z0: -1e4, z1: 1e4 };
-  const dc = (h - f.knee) / f.tA, B = f.Wz - dc, A = f.type === 'walm' ? f.Lx - dc : 1e4;
+  const dc = (h - f.knee) / f.tA;
+  if (f.type === 'pult') { // nur der Streifen ab dc hinter der niedrigen Seite
+    if (dc >= 2 * f.Wz - 0.005) return null;
+    const lo = dc <= 0 ? -1e4 : f.flip > 0 ? -f.Wz + dc : -1e4, hi = dc <= 0 ? 1e4 : f.flip > 0 ? 1e4 : f.Wz - dc;
+    return f.alongX ? { x0: -1e4, x1: 1e4, z0: f.cz + lo, z1: f.cz + hi } : { x0: f.cx + lo, x1: f.cx + hi, z0: -1e4, z1: 1e4 };
+  }
+  const B = f.Wz - dc, A = f.type === 'walm' ? f.Lx - dc : 1e4;
   if (B <= 0.005 || A <= 0.005) return null;
   return f.alongX ? { x0: f.cx - A, x1: f.cx + A, z0: f.cz - B, z1: f.cz + B } : { x0: f.cx - B, x1: f.cx + B, z0: f.cz - A, z1: f.cz + A };
 }
@@ -2829,7 +2958,11 @@ function buildWall(w, viewH, floor, parent, ops, rf) {
   g.position.set(mx, 0, mz);
   g.rotation.y = -Math.atan2(w.b[1] - w.a[1], w.b[0] - w.a[0]);
   g.userData = { kind: 'wall', key: w.key };
-  const mL = getMaterial('wall', resolveSide(floor, w, 'L').spec), mR = getMaterial('wall', resolveSide(floor, w, 'R').spec), rev = getMaterial('wall', state.defaults.wall);
+  const sL = resolveSide(floor, w, 'L').spec, sR = resolveSide(floor, w, 'R').spec;
+  let mL = getMaterial('wall', sL), mR = getMaterial('wall', sR), rev = getMaterial('wall', state.defaults.wall);
+  // Glas / Glasbausteine auf einer Seite → die ganze Wand ist aus Glas (sonst sähe man nicht hindurch)
+  const gl = texDef('wall', sL?.tex).alpha ? mL : texDef('wall', sR?.tex).alpha ? mR : null;
+  if (gl) { mL = mR = rev = gl; }
   // Dachgeschoss: Außenwände laufen bis unters Dach (Giebel, Kniestock), Innenwände bis zur Decke oder Schräge
   const ext = !(w.L && w.R), ux = (w.b[0] - w.a[0]) / L, uz = (w.b[1] - w.a[1]) / L;
   const topAt = rf ? (x => { const u = roofUnderAt(rf, mx + ux * x, mz + uz * x); return ext ? u : Math.min(H, u); }) : null;
@@ -2837,16 +2970,16 @@ function buildWall(w, viewH, floor, parent, ops, rf) {
     if (x1 - x0 < 0.002) return;
     if (y1 === null && topAt) {
       const p = profileWallGeo(x0, x1, y0, topAt, viewH, T); if (!p) return;
-      const m = new THREE.Mesh(p.geo, [mL, mR, rev, CAP_MAT]);
-      m.castShadow = true; m.receiveShadow = true; m.userData = { kind: 'wall', key: w.key, prof: { xs: p.xs, tops: p.tops, y0 } };
+      const m = new THREE.Mesh(p.geo, [mL, mR, rev, gl ? gl : CAP_MAT]);
+      m.castShadow = !gl; m.receiveShadow = true; m.userData = { kind: 'wall', key: w.key, prof: { xs: p.xs, tops: p.tops, y0 } };
       g.add(m); return;
     }
     if (y1 === null) y1 = H;
     y1 = Math.min(y1, viewH); if (y1 - y0 < 0.002) return;
     const geo = new THREE.BoxGeometry(x1 - x0, y1 - y0, T); geo.translate((x0 + x1) / 2, (y0 + y1) / 2, 0); boxUV(geo);
-    const top = y1 >= viewH - 1e-6 ? CAP_MAT : rev;
+    const top = y1 >= viewH - 1e-6 && !gl ? CAP_MAT : rev;
     const m = new THREE.Mesh(geo, [rev, rev, top, rev, mL, mR]);
-    m.castShadow = true; m.receiveShadow = true; m.userData = { kind: 'wall', key: w.key, box: { x0, x1, y0, y1 } };
+    m.castShadow = !gl; m.receiveShadow = true; m.userData = { kind: 'wall', key: w.key, box: { x0, x1, y0, y1 } };
     g.add(m);
   };
   const eA = w.ext_a ? T / 2 - 0.002 : 0, eB = w.ext_b ? T / 2 - 0.002 : 0;
@@ -2917,7 +3050,7 @@ function buildItem(it, parent, active, idx = floorIdx()) {
 
 /* ---------- Dach ---------- */
 const roofFloor = () => { const f = state.floors[state.floors.length - 1]; return f && f.roof && f.rooms.length ? f : null; };
-const roofShown = () => !!roofFloor() && (T3.whole || T3.walk.active);
+const roofShown = () => (!!roofFloor() || atticOn()) && (T3.whole || T3.walk.active);
 const exteriorSpec = floor => floor.exterior || state.world.facade || state.defaults.wall;
 // Sammelt Dreiecke (Vielecke werden als Fächer zerlegt, entartete Dreiecke übersprungen)
 function polyBuilder() {
@@ -2946,7 +3079,7 @@ function polyBuilder() {
 function buildRoof() {
   T3.roofGroup = null;
   if (!roofShown()) return;
-  const f = roofFrame(), rf = f.rf, R = state.world.roof;
+  const f = roofFrame() || atticFrame(), rf = f.rf, R = state.world.roof;
   const g = new THREE.Group(); g.userData = { kind: 'roof' }; T3.world.add(g); T3.roofGroup = g;
   const roofMat = getMaterial('roof', R.spec), soffit = plainMat('#ebe7e0', { roughness: 0.95, side: THREE.DoubleSide, emissive: '#ebe7e0', emissiveIntensity: 0.16 }), fascia = plainMat('#3a3c40', { roughness: 0.7 });
   const addMesh = (geo, mat, parent = g) => { if (!geo) return; const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true; m.userData = { kind: 'roof' }; parent.add(m); return m; };
@@ -2958,6 +3091,19 @@ function buildRoof() {
     return;
   }
   for (const part of f.parts) buildPitched(part, g, R, roofMat, soffit, fascia, addMesh);
+  if (f.attic) buildAtticWalls(f, g);
+}
+// Dachspeicher: Außenwände der obersten Ebene laufen als Kniestock und Giebel bis unters Dach weiter
+function buildAtticWalls(f, g) {
+  const top = f.rf, T = state.wallThickness, mat = getMaterial('wall', exteriorSpec(top));
+  for (const w of computeWalls(top.rooms)) {
+    if (w.L && w.R) continue;
+    const L = w.len, mx = (w.a[0] + w.b[0]) / 2, mz = (w.a[1] + w.b[1]) / 2, ux = (w.b[0] - w.a[0]) / L, uz = (w.b[1] - w.a[1]) / L;
+    const eA = w.ext_a ? T / 2 - 0.002 : 0, eB = w.ext_b ? T / 2 - 0.002 : 0;
+    const p = profileWallGeo(-L / 2 - eA, L / 2 + eB, 0, x => roofUnderAt(f, mx + ux * x, mz + uz * x), 1e3, T); if (!p) continue;
+    const m = new THREE.Mesh(p.geo, [mat, mat, mat, CAP_MAT]); m.castShadow = true; m.receiveShadow = true; m.userData = { kind: 'roof' };
+    m.position.set(mx, f.base, mz); m.rotation.y = -Math.atan2(w.b[1] - w.a[1], w.b[0] - w.a[0]); g.add(m);
+  }
 }
 // Was nach oben offen ist, bekommt ein Flachdach: Teile einer Ebene, über denen keine (kleinere) Ebene liegt,
 // und die oberste Ebene, wenn sie kein Dachgeschoss ist. Die Platte liegt knapp unter der Ebene darüber,
@@ -2972,24 +3118,30 @@ function buildOpenRoofs(ai, last) {
     if (i < last) y = floorBase(i + 1) - 0.02;
     else if (i === top && outside && fl !== rfl) y = floorBase(i) + fl.wallHeight + SLAB;
     else continue;
+    const m3 = i === top && atticOn() ? [SLAB_MAT, SLAB_MAT, CEIL_MAT] : mats;
     for (const r of fl.rooms) {
       const holes = up ? fl.items.filter(it => isStair(it) && holeRoom(it, up)).map(it => stairRect(it)).filter(h => h.every(q => strictlyInside(q, r.points))) : [];
-      const m = new THREE.Mesh(slabGeometry(r.points, holes), mats); m.position.y = y; m.receiveShadow = true; m.castShadow = true; m.raycast = () => {}; T3.world.add(m);
+      const m = new THREE.Mesh(slabGeometry(r.points, holes), m3); m.position.y = y; m.receiveShadow = true; m.castShadow = true; m.raycast = () => {}; T3.world.add(m);
     }
   }
 }
 function buildPitched(f, g, R, roofMat, soffit, fascia, addMesh) {
   // Traufe sitzt auf dem Kniestock: Dachunterseite trifft die Außenwand in Höhe „knee“
-  const { Lx, Wz, tA } = f, ca = Math.cos(R.pitch * Math.PI / 180), tv = 0.14 / ca, o = 0.45;
+  const { Lx, Wz, tA } = f, ca = Math.cos(R.pitch * Math.PI / 180), tv = 0.14 / ca, o = R.over ?? 0.45;
   const [wcx, wcz] = fromRoofL(f, f.cx, f.cz);
-  const lg = new THREE.Group(); lg.position.set(wcx, f.base + f.knee, wcz); lg.rotation.y = (f.alongX ? 0 : Math.PI / 2) - (f.ang || 0); g.add(lg);
+  const lg = new THREE.Group(); lg.position.set(wcx, f.base + f.knee, wcz); lg.rotation.y = (f.alongX ? 0 : Math.PI / 2) - (f.ang || 0) + (f.flip < 0 ? Math.PI : 0); g.add(lg);
   const Z = Wz + o, yE = -o * tA + tv, yR = Wz * tA + tv;
   const topB = polyBuilder(), under = polyBuilder(), edge = polyBuilder();
   const down = p => [p[0], p[1] - tv, p[2]];
   const face = (pts, uvs) => { topB.add(pts, uvs); under.add(pts.map(down)); };
   const strip = (p, q) => edge.add([p, q, down(q), down(p)]);
-  if (R.type === 'sattel') {
-    const X = Lx + 0.35, s = Z / ca;
+  if (R.type === 'pult') { // eine Fläche: niedrige Traufe bei -z, hohe bei +z (Unterseite: (z + Wz)·tan)
+    const X = Lx + o * 0.78, zL = -Wz - o, zH = Wz + o, yL = -o * tA + tv, yH = (2 * Wz + o) * tA + tv, s = (zH - zL) / ca;
+    const p1 = [-X, yL, zL], p2 = [X, yL, zL], p3 = [X, yH, zH], p4 = [-X, yH, zH];
+    face([p2, p1, p4, p3], [[X, 0], [-X, 0], [-X, s], [X, s]]);
+    strip(p1, p2); strip(p2, p3); strip(p3, p4); strip(p4, p1);
+  } else if (R.type === 'sattel') {
+    const X = Lx + o * 0.78, s = Z / ca;
     for (const sg of [1, -1]) {
       const e1 = [-X, yE, sg * Z], e2 = [X, yE, sg * Z], r2 = [X, yR, 0], r1 = [-X, yR, 0];
       face([e1, e2, r2, r1], [[-X, 0], [X, 0], [X, s], [-X, s]]);
@@ -3636,7 +3788,7 @@ function applyTimeOfDay() {
 function cameraPose() {
   const bb = allBBox(), k = Math.max(1, 0.9 / T3.camera.aspect), V = (x, y, z) => new THREE.Vector3(x, y, z);
   if (T3.whole) {
-    const H = floorBase(state.floors.length) + (roofFloor() ? 3 : 0);
+    const H = floorBase(state.floors.length) + (roofFloor() || atticOn() ? 3 : 0);
     return { pos: V(bb.cx + bb.size * 0.75 * k, H * 0.5 + (bb.size * 0.45 + H * 0.4 + 2) * k, bb.cz + (bb.size * 1.25 + H * 0.6) * k), target: V(bb.cx, H * 0.4, bb.cz) };
   }
   const base = floorBase(floorIdx());
@@ -4369,23 +4521,24 @@ function bindRange(input, apply, label) {
 }
 function renderHouse() {
   const box = $('#house-box'); if (!box) return;
-  const W = state.world, R = W.roof, rf = roofFloor(), topF = state.floors[state.floors.length - 1];
+  const W = state.world, R = W.roof, rf = roofFloor(), topF = state.floors[state.floors.length - 1], attic = atticOn();
   const seg = (k, opts, cur) => `<div class="seg" data-seg="${k}">${opts.map(([v, n]) => `<button data-v="${v}" class="${cur === v ? 'active' : ''}">${esc(n)}</button>`).join('')}</div>`;
   box.innerHTML = `<h3>Haus <span class="thin">&amp; Umgebung</span></h3>
     <div class="field"><label>Ansicht</label>${seg('view', [['floor', 'Diese Ebene'], ['whole', 'Ganzes Haus']], T3.whole ? 'whole' : 'floor')}</div>
     ${F().roof && R.type !== 'flach' ? '' : `<div class="field"><div class="valrow"><span class="lbl">Raumhöhe „${esc(F().name)}“</span><b data-out="fh">${fmtM(F().wallHeight)}</b></div><input type="range" data-range="fh" min="2" max="5" step="0.05" value="${F().wallHeight}"></div>`}
     <div class="field"><label>Fassade (alle Außenwände)</label><div data-slot="facade"></div></div>
     <div class="field"><label>Dach</label>
-      ${rf ? `<p class="sub" style="margin:0 0 8px">Sitzt auf „${esc(rf.name)}“ (Dachgeschoss)</p>
-        ${seg('roof', Object.entries(ROOF_TYPES), R.type)}
-        ${R.type !== 'flach' ? `<div class="valrow" style="margin-top:10px"><span class="lbl">Neigung (wie spitz)</span><b data-out="pitch">${R.pitch}°</b></div><input type="range" data-range="pitch" min="10" max="65" step="1" value="${R.pitch}">
+      ${rf || attic ? `<p class="sub" style="margin:0 0 8px">${rf ? `Sitzt auf „${esc(rf.name)}“ (Dachgeschoss)` : `Dachspeicher über „${esc(topF.name)}“ (ungenutzter Spitzboden)`}</p>
+        ${seg('roof', Object.entries(ROOF_TYPES).filter(([k]) => rf || k !== 'flach'), R.type)}
+        ${R.type !== 'flach' ? `<div class="valrow" style="margin-top:10px"><span class="lbl">Neigung (wie spitz)</span><b data-out="pitch">${R.pitch}°</b></div><input type="range" data-range="pitch" min="5" max="65" step="1" value="${R.pitch}">
         <div class="valrow" style="margin-top:6px"><span class="lbl">Kniestock (hier beginnt die Schräge)</span><b data-out="knee">${fmtM(R.knee)}</b></div><input type="range" data-range="knee" min="0" max="2.5" step="0.05" value="${R.knee}">
-        <div class="valrow" style="margin-top:6px"><span class="lbl">Raumhöhe im Dachgeschoss (Decke)</span><b data-out="rfh">${fmtM(rf.wallHeight)}</b></div><input type="range" data-range="rfh" min="2" max="5" step="0.05" value="${rf.wallHeight}">
+        <div class="valrow" style="margin-top:6px"><span class="lbl">Dachüberstand</span><b data-out="over">${fmtM(R.over)}</b></div><input type="range" data-range="over" min="0" max="1.5" step="0.05" value="${R.over}">
+        ${rf ? `<div class="valrow" style="margin-top:6px"><span class="lbl">Raumhöhe im Dachgeschoss (Decke)</span><b data-out="rfh">${fmtM(rf.wallHeight)}</b></div><input type="range" data-range="rfh" min="2" max="5" step="0.05" value="${rf.wallHeight}">` : ''}
         <p class="sub" data-out="roofinfo" style="margin:6px 0 0"></p>` : ''}
         <div data-slot="roof" style="margin-top:8px"></div>
-        <div class="btnrow" style="margin-top:8px">${R.type === 'sattel' ? '<button class="btn small" data-act="turn">First drehen</button>' : ''}<button class="btn small danger" data-act="noroof">Dach entfernen</button></div>`
-      : `<p class="hint" style="margin:0 0 8px">Noch kein Dach. Das Dach kommt auf die oberste Ebene (Dachgeschoss).</p>
-        ${topF.rooms.length ? `<button class="btn small primary" data-act="roof">Dach auf „${esc(topF.name)}“ setzen</button>` : '<p class="hint" style="margin:0">Die oberste Ebene hat noch keine Räume.</p>'}`}
+        <div class="btnrow" style="margin-top:8px">${R.type === 'sattel' ? '<button class="btn small" data-act="turn">First drehen</button>' : R.type === 'pult' ? '<button class="btn small" data-act="turn">Hohe Seite wechseln</button>' : ''}<button class="btn small danger" data-act="noroof">Dach entfernen</button></div>`
+      : `<p class="hint" style="margin:0 0 8px">Noch kein Dach. Wähle, ob die oberste Ebene ein bewohntes Dachgeschoss wird – oder ob nur ein Dachspeicher (Spitzboden) obendrauf kommt.</p>
+        ${topF.rooms.length && !topF.cellar ? `<div class="btnrow"><button class="btn small primary" data-act="roof">„${esc(topF.name)}“ wird Dachgeschoss</button><button class="btn small" data-act="attic">Dachspeicher obendrauf</button></div>` : '<p class="hint" style="margin:0">Die oberste Ebene hat noch keine Räume.</p>'}`}
     </div>
     <div class="field"><label>Umgebung</label>${seg('env', [['garden', 'Garten'], ['city', 'Großstadt']], W.env)}</div>
     ${W.plot ? `<div class="field"><label>Grundstück</label><p class="sub" style="margin:0 0 8px">${fmtA(Math.abs(polyArea(W.plot)))} · eigene Grenze</p><button class="btn small" data-act="site">Grundstück & Garten bearbeiten</button></div>`
@@ -4400,6 +4553,9 @@ function renderHouse() {
       const flatTex = R.spec.tex === 'kies' || R.spec.tex === 'gruen';
       if (v === 'flach' && !flatTex && R.spec.tex !== 'blech' && R.spec.tex !== 'farbe') R.spec = { tex: 'kies', color: ROOF_TEX.kies.color };
       if (v !== 'flach' && flatTex) R.spec = { tex: 'ziegel', color: ROOF_TEX.ziegel.color };
+      // Pultdächer sind flach geneigt, Sattel- und Walmdächer steiler
+      if (v === 'pult' && R.pitch > 22) R.pitch = 15;
+      if (v !== 'pult' && R.type === 'pult' && R.pitch < 25) R.pitch = 38;
       R.type = v;
     });
     if (k === 'env' && W.env !== v) change(() => { W.env = v; });
@@ -4414,15 +4570,24 @@ function renderHouse() {
   if (rs) rs.append(texPicker('roof', R.spec, spec => change(() => { R.spec = spec; })));
   const pr = box.querySelector('[data-range="pitch"]');
   const roofInfo = () => {
-    const out = box.querySelector('[data-out="roofinfo"]'), f = roofFrame(); if (!out || !f) return;
-    const ridge = f.knee + Math.max(...f.parts.map(p => p.Wz)) * f.tA, d2 = Math.max(0, (2 - f.knee) / f.tA);
+    const out = box.querySelector('[data-out="roofinfo"]'), f = roofFrame() || atticFrame(); if (!out || !f) return;
+    const ridge = f.knee + Math.max(...f.parts.map(p => p.Wz)) * f.tA * (f.type === 'pult' ? 2 : 1), d2 = Math.max(0, (2 - f.knee) / f.tA);
+    if (f.attic) {
+      // Dachspeicher: Grundfläche mit mindestens 1 m und 1,8 m lichter Höhe (Stauraum / Stehhöhe)
+      let A = 0, A1 = 0, A18 = 0;
+      for (const r of f.rf.rooms) { A += Math.abs(polyArea(r.points)); for (const [h, add] of [[1, a => A1 += a], [1.8, a => A18 += a]]) { const pf = partFor(f, ...interiorPoint(r.points)), RR = roofRegion(pf, h); if (RR) { const c = clipToRoof(r.points, pf, RR); if (c.length) add(Math.abs(polyArea(c))); } } }
+      out.innerHTML = `${f.type === 'pult' ? 'Höchste Stelle' : 'First'} ${fmtM(ridge)} über dem Speicherboden<br>Stauraum <b>${fmtA(A1)}</b> mit mind. 1 m Höhe · davon ${fmtA(A18)} begehbar (ab 1,80 m) <span class="thin">von ${fmtA(A)}</span>`;
+      return;
+    }
     let A = 0, U = 0; for (const r of f.rf.rooms) { const u = roomUsable(r, f.rf); A += u.A; U += u.usable; }
-    out.innerHTML = `First ${fmtM(ridge)} über dem Boden · 2 m Stehhöhe ab ${fmtM(d2)} hinter der Außenwand<br>Wohnfläche <b>${fmtA(U)}</b> <span class="thin">von ${fmtA(A)} Grundfläche (unter 1 m zählt nicht, 1–2 m zur Hälfte)</span>`;
+    out.innerHTML = `${f.type === 'pult' ? 'Höchste Stelle' : 'First'} ${fmtM(ridge)} über dem Boden · 2 m Stehhöhe ab ${fmtM(d2)} hinter der Außenwand<br>Wohnfläche <b>${fmtA(U)}</b> <span class="thin">von ${fmtA(A)} Grundfläche (unter 1 m zählt nicht, 1–2 m zur Hälfte)</span>`;
   };
   roofInfo();
-  if (pr) bindRange(pr, v => { R.pitch = clamp(Math.round(v), 10, 65); }, () => { box.querySelector('[data-out="pitch"]').textContent = R.pitch + '°'; roofInfo(); });
+  if (pr) bindRange(pr, v => { R.pitch = clamp(Math.round(v), 5, 65); }, () => { box.querySelector('[data-out="pitch"]').textContent = R.pitch + '°'; roofInfo(); });
   const kn = box.querySelector('[data-range="knee"]');
   if (kn) bindRange(kn, v => { R.knee = clamp(r3(v), 0, 2.5); }, () => { box.querySelector('[data-out="knee"]').textContent = fmtM(R.knee); roofInfo(); });
+  const ov = box.querySelector('[data-range="over"]');
+  if (ov) bindRange(ov, v => { R.over = clamp(r3(v), 0, 1.5); }, () => { box.querySelector('[data-out="over"]').textContent = fmtM(R.over); });
   const rh = box.querySelector('[data-range="rfh"]');
   if (rh) bindRange(rh, v => { rf.wallHeight = clamp(r3(v), 2, 5); }, () => { box.querySelector('[data-out="rfh"]').textContent = fmtM(rf.wallHeight); roofInfo(); });
   const fh = box.querySelector('[data-range="fh"]');
@@ -4430,20 +4595,29 @@ function renderHouse() {
   box.querySelectorAll('[data-act="site"]').forEach(b => b.addEventListener('click', () => { setMode('plan'); setLayer('site'); }));
   if (box.querySelector('[data-range="garden"]')) bindRange(box.querySelector('[data-range="garden"]'), v => { W.garden = clamp(v, 1, 30); }, () => { box.querySelector('[data-out="garden"]').textContent = fmtM(W.garden); });
   box.querySelector('[data-act="turn"]')?.addEventListener('click', () => change(() => { R.turn = !R.turn; }));
-  box.querySelector('[data-act="noroof"]')?.addEventListener('click', () => { change(() => { topF.roof = false; }); if (T3.sel?.kind === 'roof') setSel(null); toast('Dach entfernt.'); });
+  box.querySelector('[data-act="noroof"]')?.addEventListener('click', () => { change(() => { topF.roof = false; R.attic = false; }); if (T3.sel?.kind === 'roof') setSel(null); toast('Dach entfernt.'); });
+  box.querySelector('[data-act="attic"]')?.addEventListener('click', () => {
+    checkpoint(); R.attic = true; if (R.type === 'flach') R.type = 'sattel';
+    if (R.spec.tex === 'kies' || R.spec.tex === 'gruen') R.spec = { tex: 'ziegel', color: ROOF_TEX.ziegel.color };
+    scheduleSave(); renderFloorUI();
+    if (!T3.whole) setWhole(true); else { build3D(); renderHouse(); }
+    toast(`Dachspeicher auf „${topF.name}“ gesetzt – Form, Neigung und Deckung stellst du hier ein.`);
+  });
   box.querySelector('[data-act="roof"]')?.addEventListener('click', () => {
-    checkpoint(); topF.roof = true; scheduleSave(); renderFloorUI();
+    checkpoint(); topF.roof = true; R.attic = false; scheduleSave(); renderFloorUI();
     if (!T3.whole) setWhole(true); else { build3D(); renderHouse(); }
     toast(`Dach auf „${topF.name}“ gesetzt – du siehst das ganze Haus.`);
   });
 }
 function renderRoofProps(box) {
   const R = state.world.roof, rf = roofFloor();
+  const topF = state.floors[state.floors.length - 1];
   box.innerHTML = `<h3>Dach <span class="thin">${esc(ROOF_TYPES[R.type])}</span></h3>
-    <div class="kv"><span>Auf Ebene</span><b>${esc(rf?.name || '–')}</b></div>
-    <div class="kv"><span>Deckung</span><b>${esc(texDef('roof', R.spec.tex).name)}</b></div>
+    <div class="kv"><span>${rf ? 'Auf Ebene' : 'Dachspeicher über'}</span><b>${esc(rf?.name || topF?.name || '–')}</b></div>
     ${R.type !== 'flach' ? `<div class="kv"><span>Neigung</span><b>${R.pitch}°</b></div>` : ''}
-    <div class="btnrow" style="margin-top:12px"><button class="btn small" id="p-roofedit">Dach bearbeiten</button></div>`;
+    <div class="field" style="margin-top:10px"><label>Deckung &amp; Farbe</label><div data-slot="roofspec"></div></div>
+    <div class="btnrow" style="margin-top:12px"><button class="btn small" id="p-roofedit">Form, Neigung, Überstand …</button></div>`;
+  box.querySelector('[data-slot="roofspec"]').append(texPicker('roof', R.spec, spec => { checkpoint(); R.spec = spec; scheduleSave(); build3D(); renderHouse(); }));
   $('#p-roofedit').addEventListener('click', showHouseBox);
 }
 function renderWallProps(box, s) {
@@ -4735,7 +4909,7 @@ function initUI() {
   $('#floor-del').addEventListener('click', deleteFloor);
   $('#floor-kind').addEventListener('change', e => {
     const f = F(); if (f !== state.floors[state.floors.length - 1]) { renderFloorUI(); return; }
-    checkpoint(); f.roof = e.target.value === 'roof'; scheduleSave(); renderFloorUI();
+    checkpoint(); f.roof = e.target.value === 'roof'; if (f.roof) state.world.roof.attic = false; scheduleSave(); renderFloorUI();
     toast(f.roof ? `„${f.name}“ ist jetzt das Dachgeschoss – in der 3D-Ansicht unter „Ganzes Haus“ siehst du das Dach.` : 'Kein Dach mehr.');
   });
   $('#def-height').addEventListener('change', e => {
