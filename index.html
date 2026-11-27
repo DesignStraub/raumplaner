@@ -49,6 +49,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .menu{position:relative}
 .menu-pop{position:absolute;right:0;top:calc(100% + 8px);background:rgba(255,255,255,.85);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border:.5px solid var(--sep);border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.16);padding:5px;min-width:220px;display:flex;flex-direction:column;z-index:60}
 .menu-pop[hidden]{display:none}
+.btn[hidden]{display:none}
 .menu-pop button{font:inherit;text-align:left;border:0;background:none;padding:8px 12px;border-radius:7px;cursor:pointer;color:var(--text)}
 .menu-pop button:hover,.menu-pop button:focus-visible{background:var(--accent);color:#fff;outline:none}
 main{flex:1;min-height:0;display:flex;position:relative}
@@ -308,6 +309,7 @@ body.booting>header,body.booting>main{animation:appIn 1.25s cubic-bezier(.2,.8,.
   <div class="spacer"></div>
   <button class="btn icon" id="btn-undo" title="Rückgängig (Strg/Cmd+Z)" aria-label="Rückgängig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
   <button class="btn icon" id="btn-redo" title="Wiederholen (Strg/Cmd+Umschalt+Z)" aria-label="Wiederholen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
+  <button class="btn icon" id="btn-full" title="Vollbild" aria-label="Vollbild" aria-pressed="false" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="fs-on" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/><path class="fs-off" d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" style="display:none"/></svg></button>
   <div class="menu">
     <button class="btn icon" id="btn-menu" aria-label="Menü" title="Projekt" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-pop"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
     <div class="menu-pop" id="menu-pop" role="menu" aria-label="Projekt" hidden>
@@ -4934,6 +4936,22 @@ function initUI() {
   $('#zoom-in').addEventListener('click', () => zoomAt(cv.clientWidth / 2, cv.clientHeight / 2, 1.25));
   $('#zoom-out').addEventListener('click', () => zoomAt(cv.clientWidth / 2, cv.clientHeight / 2, 0.8));
   $('#zoom-fit').addEventListener('click', fitPlan);
+  // Vollbild über die App: Esc bleibt dann (in Chrome/Edge per Keyboard-Lock) bei der App – Menü schließen, Auswahl aufheben …
+  // Zum Verlassen Esc gedrückt halten oder den Knopf nochmal drücken. Browser-eigenes Vollbild (F11, grüner Knopf) beendet sich bei Esc selbst.
+  const fsBtn = $('#btn-full'), root = document.documentElement;
+  if (document.fullscreenEnabled || document.webkitFullscreenEnabled) fsBtn.hidden = false;
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+  fsBtn.addEventListener('click', async () => {
+    try {
+      if (fsEl()) { navigator.keyboard?.unlock?.(); await (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+      await (root.requestFullscreen || root.webkitRequestFullscreen).call(root);
+      await navigator.keyboard?.lock?.(['Escape']);
+      toast(navigator.keyboard?.lock ? 'Vollbild – zum Beenden Esc gedrückt halten.' : 'Vollbild – zum Beenden den Knopf oben rechts drücken.');
+    } catch (err) { /* Keyboard-Lock nicht verfügbar: Vollbild läuft trotzdem */ }
+  });
+  const fsSync = () => { const on = !!fsEl(); fsBtn.setAttribute('aria-pressed', String(on)); fsBtn.title = fsBtn.ariaLabel = on ? 'Vollbild beenden' : 'Vollbild';
+    fsBtn.querySelector('.fs-on').style.display = on ? 'none' : ''; fsBtn.querySelector('.fs-off').style.display = on ? '' : 'none'; if (!on) navigator.keyboard?.unlock?.(); };
+  document.addEventListener('fullscreenchange', fsSync); document.addEventListener('webkitfullscreenchange', fsSync);
   // Menü: Maus oder Tastatur (Enter/Leertaste/↓ öffnet, ↑↓ Pos1 Ende wählen, Enter führt aus, Esc/Tab schließt)
   const pop = $('#menu-pop'), mbtn = $('#btn-menu'), mItems = () => [...pop.querySelectorAll('[role="menuitem"]')];
   const setMenu = (open, focus) => {
