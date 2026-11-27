@@ -2,13 +2,15 @@
 # Legt die ElevenLabs-Sprachaufnahmen (und optional Musik) unter das gerenderte Video.
 #   ./mux.sh trailer   → out/raumplaner-trailer-mit-ton.mp4
 #   ./mux.sh short     → out/raumplaner-short-mit-ton.mp4
-# Erwartet: vo/<name>/01.mp3, 02.mp3 … (Startzeiten stehen in cues.json), optional musik/<name>.mp3
+# Erwartet: vo/<name>.mp3 (eine Gesamtaufnahme, wird an den Pausen zerlegt)
+#        oder vo/<name>/01.mp3, 02.mp3 … (Startzeiten stehen in cues.json), optional musik/<name>.mp3
 set -euo pipefail
 cd "$(dirname "$0")"
 NAME="${1:-trailer}"
 VIDEO="out/raumplaner-$NAME.mp4"
 OUT="out/raumplaner-$NAME-mit-ton.mp4"
 [ -f "$VIDEO" ] || { echo "Video fehlt: $VIDEO (erst: node render.mjs $NAME)"; exit 1; }
+[ -f "vo/$NAME.mp3" ] && python3 split_vo.py "$NAME"
 STARTS=$(python3 -c "import json;print(' '.join(str(c['start']) for c in json.load(open('cues.json'))['$NAME']))")
 DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$VIDEO")
 INPUTS=(-i "$VIDEO"); FILTER=""; MIX=""; n=0; idx=1

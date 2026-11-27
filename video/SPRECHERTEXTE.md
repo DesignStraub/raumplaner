@@ -2,13 +2,59 @@
 
 Die Videos sind ohne Ton gerendert und exakt auf diese Texte getaktet. Jede Zeile hat eine Startzeit und ein Zeitfenster. Wenn eine Aufnahme kürzer ist, passt das. Länger als das Fenster sollte sie nicht sein.
 
-**ElevenLabs-Tipps**
-- Stimme ruhig, warm und erzählend, wie bei einem Apple-Keynote-Trailer.
-- Einstellungen: Stability ca. 45 %, Similarity ca. 75 %, Style ca. 20 %.
-- Jede Zeile einzeln generieren und als MP3 speichern. Die Dateinamen stehen in der Tabelle.
-- Gedankenstriche (–) und Auslassungspunkte (…) erzeugen kleine Pausen. Die sind gewollt.
+**So geht's mit ElevenLabs**
+1. Modell **Eleven Multilingual v2** wählen. Es versteht die Pausen-Marken `<break time="2s" />`.
+2. Den gesammelten Text unten komplett einfügen und als **eine** MP3 erzeugen.
+3. Speichern als `video/vo/trailer.mp3` bzw. `video/vo/short.mp3`.
+4. `./mux.sh trailer` (oder `short`) zerlegt die Aufnahme an den Pausen und setzt jeden Satz an die richtige Stelle im Video.
 
-Die Dateien kommen nach `video/vo/trailer/` bzw. `video/vo/short/`. Danach legt `./mux.sh trailer` (oder `./mux.sh short`) alles automatisch an die richtigen Stellen. Optional wird Musik aus `video/musik/trailer.mp3` bzw. `video/musik/short.mp3` leise darunter gelegt.
+Stimme ruhig, warm und erzählend. Einstellungen: Stability ca. 45 %, Similarity ca. 75 %, Style ca. 20 %. Gedankenstriche (–) und Auslassungspunkte (…) erzeugen kleine Pausen. Die sind gewollt.
+
+### Trailer – gesammelt
+
+```text
+Jedes Zuhause beginnt mit einer Idee.
+<break time="2s" />
+Mit dem Raumplaner zeichnest du deinen Grundriss – Raum für Raum, direkt im Browser.
+<break time="2s" />
+Ein Klick – und aus Linien werden Räume.
+<break time="2s" />
+Setze Möbel, Türen und Fenster. Drehe und skaliere alles, wie du willst. Wähle Böden, Farben und Texturen.
+<break time="2s" />
+Stockwerke, Treppen, Dach und Balkon: Plane das ganze Haus.
+<break time="2s" />
+Im Garten – oder mitten in der Stadt. Bei Tag … und bei Nacht.
+<break time="2s" />
+Und dann geh einfach hinein. Lauf durch dein Zuhause – noch bevor es gebaut ist.
+<break time="2s" />
+Am Rechner, am Tablet oder am Handy. Kostenlos und ohne Anmeldung.
+<break time="2s" />
+Und: Der Raumplaner ist Open Source. Jeder kann mitbauen – neue Möbel, neue Ideen, neue Funktionen. Mach mit!
+<break time="2s" />
+Raumplaner. Von OneHumanity Labs. One Planet, One Humanity.
+```
+
+### Short – gesammelt
+
+```text
+Dein Traumhaus in 3D – kostenlos im Browser.
+<break time="2s" />
+Zeichne deinen Grundriss, Raum für Raum – sogar am Handy.
+<break time="2s" />
+Ein Tipp – und alles steht in 3D.
+<break time="2s" />
+Möbel, Böden, Farben: alles frei wählbar.
+<break time="2s" />
+Mit Dach und Balkon. Garten oder Stadt, Tag oder Nacht.
+<break time="2s" />
+Und dann: einfach durchlaufen.
+<break time="2s" />
+Open Source – jeder kann mitbauen.
+<break time="2s" />
+Raumplaner. Link in der Beschreibung.
+```
+
+Optional wird Musik aus `video/musik/trailer.mp3` bzw. `video/musik/short.mp3` leise darunter gelegt. Einzelne Dateien (`vo/trailer/01.mp3` …) funktionieren weiterhin.
 
 ---
 
