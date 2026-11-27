@@ -50,7 +50,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .menu-pop{position:absolute;right:0;top:calc(100% + 8px);background:rgba(255,255,255,.85);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border:.5px solid var(--sep);border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.16);padding:5px;min-width:220px;display:flex;flex-direction:column;z-index:60}
 .menu-pop[hidden]{display:none}
 .menu-pop button{font:inherit;text-align:left;border:0;background:none;padding:8px 12px;border-radius:7px;cursor:pointer;color:var(--text)}
-.menu-pop button:hover{background:var(--accent);color:#fff}
+.menu-pop button:hover,.menu-pop button:focus-visible{background:var(--accent);color:#fff;outline:none}
 main{flex:1;min-height:0;display:flex;position:relative}
 .view{flex:1;display:flex;min-height:0;min-width:0}
 .view[hidden]{display:none}
@@ -309,11 +309,11 @@ body.booting>header,body.booting>main{animation:appIn 1.25s cubic-bezier(.2,.8,.
   <button class="btn icon" id="btn-undo" title="Rückgängig (Strg/Cmd+Z)" aria-label="Rückgängig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
   <button class="btn icon" id="btn-redo" title="Wiederholen (Strg/Cmd+Umschalt+Z)" aria-label="Wiederholen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
   <div class="menu">
-    <button class="btn icon" id="btn-menu" aria-label="Menü" title="Projekt"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
-    <div class="menu-pop" id="menu-pop" hidden>
-      <button id="m-new">Neues Projekt</button>
-      <button id="m-export">Projekt speichern (Datei)</button>
-      <button id="m-import">Projekt öffnen (Datei)…</button>
+    <button class="btn icon" id="btn-menu" aria-label="Menü" title="Projekt" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-pop"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
+    <div class="menu-pop" id="menu-pop" role="menu" aria-label="Projekt" hidden>
+      <button id="m-new" role="menuitem" tabindex="-1">Neues Projekt</button>
+      <button id="m-export" role="menuitem" tabindex="-1">Projekt speichern (Datei)</button>
+      <button id="m-import" role="menuitem" tabindex="-1">Projekt öffnen (Datei)…</button>
     </div>
   </div>
   <input type="file" id="file-import" accept=".json,application/json" hidden>
@@ -4934,9 +4934,33 @@ function initUI() {
   $('#zoom-in').addEventListener('click', () => zoomAt(cv.clientWidth / 2, cv.clientHeight / 2, 1.25));
   $('#zoom-out').addEventListener('click', () => zoomAt(cv.clientWidth / 2, cv.clientHeight / 2, 0.8));
   $('#zoom-fit').addEventListener('click', fitPlan);
-  const pop = $('#menu-pop');
-  $('#btn-menu').addEventListener('click', e => { e.stopPropagation(); pop.hidden = !pop.hidden; });
-  document.addEventListener('click', e => { if (!pop.hidden && !pop.contains(e.target)) pop.hidden = true; });
+  // Menü: Maus oder Tastatur (Enter/Leertaste/↓ öffnet, ↑↓ Pos1 Ende wählen, Enter führt aus, Esc/Tab schließt)
+  const pop = $('#menu-pop'), mbtn = $('#btn-menu'), mItems = () => [...pop.querySelectorAll('[role="menuitem"]')];
+  const setMenu = (open, focus) => {
+    pop.hidden = !open; mbtn.setAttribute('aria-expanded', String(open));
+    if (open && focus != null) { const it = mItems(); it[(focus + it.length) % it.length]?.focus(); }
+    if (!open && focus === 'button') mbtn.focus();
+  };
+  new MutationObserver(() => mbtn.setAttribute('aria-expanded', String(!pop.hidden))).observe(pop, { attributes: true, attributeFilter: ['hidden'] });
+  mbtn.addEventListener('click', e => { e.stopPropagation(); setMenu(pop.hidden, e.detail === 0 ? 0 : null); }); // e.detail 0 = per Tastatur ausgelöst
+  mbtn.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); setMenu(true, e.key === 'ArrowDown' ? 0 : -1); }
+    else if (e.key === 'Escape' && !pop.hidden) { e.stopPropagation(); setMenu(false); }
+  });
+  pop.addEventListener('keydown', e => {
+    const it = mItems(), i = it.indexOf(document.activeElement);
+    const go = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: -1 }[e.key];
+    if (go !== undefined) { e.preventDefault(); setMenu(true, go); }
+    else if (e.key === 'Escape') { e.preventDefault(); setMenu(false, 'button'); }
+    else if (e.key === 'Tab') setMenu(false);
+    else if (e.key.length === 1 && /\S/.test(e.key)) { // Anfangsbuchstabe springt zum passenden Eintrag
+      const k = e.key.toLowerCase(), n = it.length;
+      for (let d = 1; d <= n; d++) { const j = (i + d) % n; if (it[j].textContent.trim().toLowerCase().startsWith(k)) { it[j].focus(); break; } }
+    }
+    e.stopPropagation(); // keine Grundriss-/3D-Tastenkürzel, solange das Menü den Fokus hat
+  });
+  pop.addEventListener('click', () => { if (pop.contains(document.activeElement)) mbtn.focus(); });
+  document.addEventListener('click', e => { if (!pop.hidden && !pop.contains(e.target)) setMenu(false); });
   $('#m-new').addEventListener('click', () => {
     pop.hidden = true;
     if (!confirm('Neues, leeres Projekt beginnen? (Rückgängig ist möglich)')) return;
