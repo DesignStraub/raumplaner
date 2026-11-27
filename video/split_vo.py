@@ -21,10 +21,30 @@ ends = [float(x) for x in re.findall(r'silence_end: ([\d.]+)', log)]
 gaps = [(e - s, s, e) for s, e in zip(starts, ends) if s > 0.05 and e < dur - 0.05]
 if len(gaps) < n - 1:
     sys.exit(f'Nur {len(gaps) + 1} Abschnitte gefunden, erwartet {n}. Stehen die <break time="2s" />-Pausen im Text?')
-cuts = sorted(sorted(gaps, reverse=True)[:n - 1], key=lambda g: g[1])
-shortest_cut, longest_rest = cuts and min(c[0] for c in cuts), max([g[0] for g in gaps if g not in cuts] or [0])
-if cuts and shortest_cut < longest_rest * 1.3:
-    print(f'Achtung: Pausen zwischen den Zeilen ({shortest_cut:.2f} s) kaum länger als innerhalb ({longest_rest:.2f} s) – bitte Ergebnis prüfen.')
+# Schnitte so wählen, dass jede Zeile etwa so lang ist, wie ihr Text es erwarten lässt.
+# Lange Pausen werden bevorzugt (falls <break>-Marken umgesetzt wurden), sind aber nicht nötig.
+gaps.sort(key=lambda g: g[1])
+chars = [len(c['text']) for c in cues]
+speech = dur - sum(g[0] for g in gaps)
+exp = [speech * k / sum(chars) for k in chars]
+maxgap = max(g[0] for g in gaps)
+G = len(gaps)
+def seg_cost(i, a_end, b_start):  # Zeile i läuft vom Ende einer Pause bis zum Anfang der nächsten
+    d = b_start - a_end
+    return ((d - exp[i]) / exp[i]) ** 2
+INF = float('inf')
+# best[i][j]: Zeilen 0..i gesetzt, Zeile i endet an Pause j
+best = [[INF] * G for _ in range(n)]; prev = [[-1] * G for _ in range(n)]
+for j in range(G): best[0][j] = seg_cost(0, 0.0, gaps[j][1]) - 0.5 * gaps[j][0] / maxgap
+for i in range(1, n - 1):
+    for j in range(G):
+        for k in range(j):
+            c = best[i - 1][k] + seg_cost(i, gaps[k][2], gaps[j][1]) - 0.5 * gaps[j][0] / maxgap
+            if c < best[i][j]: best[i][j], prev[i][j] = c, k
+fin = min(range(G), key=lambda k: best[n - 2][k] + seg_cost(n - 1, gaps[k][2], dur))
+idx = [fin]
+for i in range(n - 2, 0, -1): idx.append(prev[i][idx[-1]])
+cuts = [gaps[j] for j in reversed(idx)]
 
 out_dir = os.path.join(here, 'vo', name)
 os.makedirs(out_dir, exist_ok=True)
