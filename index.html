@@ -2652,12 +2652,32 @@ function boxUV(g) {
 const shapeOf = pts => new THREE.Shape(pts.map(p => new THREE.Vector2(p[0], -p[1])));
 function floorGeometry(pts) { const g = new THREE.ShapeGeometry(shapeOf(pts)); g.rotateX(-Math.PI / 2); return g; }
 // Decke/Boden als Platte: Material 0 = Oberseite, 1 = Kanten, 2 = Unterseite (Zimmerdecke darunter). holes = Treppenlöcher
-function slabGeometry(pts, holes = []) {
+// Vieleck um d nach innen versetzen (Schnittpunkt der parallel verschobenen Kanten)
+function insetPoly(pts, d) {
+  const n = pts.length, sg = polyArea(pts) > 0 ? 1 : -1, out = [];
+  for (let i = 0; i < n; i++) {
+    const a = pts[(i + n - 1) % n], b = pts[i], c = pts[(i + 1) % n];
+    const e1 = norm2([b[0] - a[0], b[1] - a[1]]), e2 = norm2([c[0] - b[0], c[1] - b[1]]);
+    const n1 = [-e1[1] * sg, e1[0] * sg], n2 = [-e2[1] * sg, e2[0] * sg], k = 1 + n1[0] * n2[0] + n1[1] * n2[1];
+    out.push(k < 0.05 ? b : [b[0] + (n1[0] + n2[0]) * d / k, b[1] + (n1[1] + n2[1]) * d / k]);
+  }
+  return out;
+}
+const norm2 = v => { const L = Math.hypot(v[0], v[1]) || 1; return [v[0] / L, v[1] / L]; };
+// Platte (Decke/Boden/Flachdach). Die Seitenflächen enden 3 mm unter der Oberseite und über der Unterseite:
+// So liegen an Nähten zwischen Nachbarräumen keine Kanten deckungsgleich übereinander (sonst flimmern Linien).
+function slabGeometry(pts, holes = [], inset = 0) {
+  if (inset) pts = insetPoly(pts, inset);
   const sh = shapeOf(pts);
   for (const h of holes) sh.holes.push(new THREE.Path(h.map(p => new THREE.Vector2(p[0], -p[1]))));
   const g = new THREE.ExtrudeGeometry(sh, { depth: SLAB, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, -SLAB + 0.001, 0);
   const lid = g.groups[0], half = lid.count / 2; // erst Unterseite, dann Oberseite
   g.groups = [{ start: lid.start, count: half, materialIndex: 2 }, { start: lid.start + half, count: half, materialIndex: 0 }, ...g.groups.slice(1)];
+  const pa = g.attributes.position, top = 0.001, bot = -SLAB + 0.001;
+  for (const gr of g.groups.slice(2)) for (let v = gr.start; v < gr.start + gr.count; v++) {
+    const y = pa.getY(v); if (y > top - 1e-4) pa.setY(v, top - 0.003); else if (y < bot + 1e-4) pa.setY(v, bot + 0.003);
+  }
+  pa.needsUpdate = true;
   return g;
 }
 function viewHeight(floor) { return (T3.walk.active || T3.whole || floor !== F()) ? floor.wallHeight : Math.min(floor.wallHeight, T3.cut ?? floor.wallHeight); }
@@ -2988,7 +3008,9 @@ function buildWall(w, viewH, floor, parent, ops, rf) {
   let cur = -L / 2 - eA;
   for (const { o, pos } of ops.slice().sort((p, q) => p.pos - q.pos)) {
     const x0 = -L / 2 + pos - o.width / 2, x1 = x0 + o.width, bottom = openingBottom(o), top = Math.min(H, bottom + o.height);
-    addPart(cur, x0, 0, null); addPart(x0, x1, 0, bottom); addPart(x0, x1, top, null);
+    // Stücke unter/über der Öffnung greifen 1 mm in die Nachbarstücke (gleiche Textur, gleiche UVs → unsichtbar).
+    // Sonst blitzen an den Stoßkanten die Stirnseiten durch feine Rasterlücken (flimmernde Linien neben Fenstern).
+    addPart(cur, x0, 0, null); addPart(x0 - 0.001, x1 + 0.001, 0, bottom); addPart(x0 - 0.001, x1 + 0.001, top, null);
     cur = x1;
     buildOpening(g, w, o, x0, x1, bottom, top, viewH, H);
   }
@@ -3038,15 +3060,17 @@ function buildItem(it, parent, active, idx = floorIdx()) {
   const g = new THREE.Group(); g.position.set(it.x, 0, it.y); g.rotation.y = -it.rot; g.userData = { kind: 'item', id: it.id };
   if (d.stair) buildStair(it, g, floorRise(idx));
   const sz = itemSize(it), inner = new THREE.Group(); inner.scale.set(sz.w / d.w, d.stair ? 1 : sz.h / sz.h0, sz.d / d.d); g.add(inner);
-  for (const p of d.parts) {
+  d.parts.forEach((p, k) => {
+    // Jedes Teil minimal unterschiedlich groß: bündige Flächen zweier Teile liegen so nie exakt aufeinander (kein Flimmern)
+    const e = 0.0008 * (1 + (k % 5));
     let geo;
-    if (p[0] === 'b') { geo = new THREE.BoxGeometry(p[5], p[6], p[7]); }
-    else if (p[0] === 'c') { geo = new THREE.CylinderGeometry(p[5], p[5], p[6], 20); }
+    if (p[0] === 'b') { geo = new THREE.BoxGeometry(Math.max(0.002, p[5] - e), Math.max(0.002, p[6] - e), Math.max(0.002, p[7] - e)); }
+    else if (p[0] === 'c') { geo = new THREE.CylinderGeometry(Math.max(0.002, p[5] - e / 2), Math.max(0.002, p[5] - e / 2), Math.max(0.002, p[6] - e), 20); }
     else { geo = new THREE.IcosahedronGeometry(p[5], 1); }
     const m = new THREE.Mesh(geo, furnMat(p[1], it.color));
     m.position.set(p[2], p[3], p[4]); m.castShadow = p[1] !== 'glass'; m.receiveShadow = true;
     inner.add(m);
-  }
+  });
   parent.add(g); if (active) T3.itemGroups.set(it.id, g);
 }
 
@@ -3123,7 +3147,7 @@ function buildOpenRoofs(ai, last) {
     const m3 = i === top && atticOn() ? [SLAB_MAT, SLAB_MAT, CEIL_MAT] : mats;
     for (const r of fl.rooms) {
       const holes = up ? fl.items.filter(it => isStair(it) && holeRoom(it, up)).map(it => stairRect(it)).filter(h => h.every(q => strictlyInside(q, r.points))) : [];
-      const m = new THREE.Mesh(slabGeometry(r.points, holes), m3); m.position.y = y; m.receiveShadow = true; m.castShadow = true; m.raycast = () => {}; T3.world.add(m);
+      const m = new THREE.Mesh(slabGeometry(r.points, holes, i < last ? 0.006 : 0), m3); m.position.y = y; m.receiveShadow = true; m.castShadow = true; m.raycast = () => {}; T3.world.add(m);
     }
   }
 }
@@ -3554,6 +3578,27 @@ function buildLines(floor, group, active) {
     const m = new THREE.Mesh(geo, mat); m.renderOrder = 20; m.raycast = () => {}; m.userData = { kind: 'line', id: l.id }; group.add(m);
   }
 }
+// Werbeplakate (City-Light-Poster): Parodie auf schlechte Dating-/Klick-Werbung
+const POSTERS = [
+  { bg: ['#ff2d55', '#ff7a00'], top: '⚠ ACHTUNG', head: '5 Pfandsammler in deiner Nähe', big: 'wollen dein Flaschenpfand!', btn: 'Jetzt Leergut matchen ›', small: 'Nur noch 3 Minuten · 98 % Match' },
+  { bg: ['#7b2ff7', '#f107a3'], top: 'NEU IN DEINER STADT', head: 'Einsame Dachgeschosse', big: 'suchen Kniestock zum Kuscheln', btn: 'Profil ansehen ›', small: '12 Dachschrägen sind gerade online' },
+  { bg: ['#0a84ff', '#30d158'], top: 'DIESER EINE TRICK', head: 'Architekten HASSEN ihn:', big: 'Grundriss in 5 Minuten!', btn: 'Kostenlos & Open Source ›', small: 'Ärzte sind sprachlos. Statiker auch.' },
+  { bg: ['#ffcc00', '#ff3b30'], top: '🎉 GLÜCKWUNSCH!', head: 'Du bist der 1.000.000. Besucher', big: 'Gewinn: 1 tragende Wand', btn: 'Jetzt abholen ›', small: 'Selbstabholung · Statik nicht inklusive' },
+  { bg: ['#ff375f', '#5e5ce6'], top: 'HEY DU 👋', head: 'Lisa (34, Statikerin)', big: 'will deine Raumhöhe wissen', btn: 'Antworten ›', small: '3 km entfernt · tippt gerade …' },
+];
+function posterTex(i) {
+  const P = POSTERS[i % POSTERS.length];
+  return envTex('poster|' + (i % POSTERS.length), 512, 768, (x, w, h) => {
+    const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, P.bg[0]); g.addColorStop(1, P.bg[1]); x.fillStyle = g; x.fillRect(0, 0, w, h);
+    x.textAlign = 'center'; x.fillStyle = '#fff'; const F = (sz, wt = 800) => `${wt} ${sz}px "Helvetica Neue", Arial, sans-serif`;
+    const wrap = (t, y, sz, wt, lh) => { x.font = F(sz, wt); const words = t.split(' '); let line = '', ys = y; for (const wd of words) { const tr = line ? line + ' ' + wd : wd; if (x.measureText(tr).width > w - 70 && line) { x.fillText(line, w / 2, ys); line = wd; ys += lh; } else line = tr; } x.fillText(line, w / 2, ys); return ys + lh; };
+    x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(0, 40, w, 74); x.fillStyle = '#fff'; x.font = F(42, 900); x.fillText(P.top, w / 2, 92);
+    let y = wrap(P.head, 210, 44, 700, 54); y = wrap(P.big, y + 30, 64, 900, 72);
+    const bw = w - 110, by = Math.max(y + 30, 560); x.fillStyle = '#fff'; x.beginPath(); x.roundRect(55, by, bw, 82, 41); x.fill();
+    x.fillStyle = P.bg[0]; x.font = F(34, 800); x.fillText(P.btn, w / 2, by + 54);
+    x.fillStyle = 'rgba(255,255,255,.85)'; x.font = F(24, 500); x.fillText(P.small, w / 2, h - 34);
+  });
+}
 function buildCity({ px0, px1, pz0, pz1, cx, cz, night, R, lights }) {
   const SW = 3.2, RW = 10, P = 46, K = LITE ? 2 : 3, CURB = 0.12, Y0 = -CURB;
   const batch = makeBatch(), env = T3.env;
@@ -3656,6 +3701,9 @@ function buildCity({ px0, px1, pz0, pz1, cx, cz, night, R, lights }) {
   const trunkM = plainMat(nightCol('#3f3127'), { roughness: 1 }), grateM = plainMat(nightCol('#2a2b2d'), { roughness: 0.8, metalness: 0.4 });
   const crownMs = ['#2c4a2f', '#36573a', '#294432', '#3f6040'].map(c => plainMat(nightCol(c), { roughness: 1, flatShading: true }));
   const near = 95;
+  let posterN = 0;
+  const caseM = plainMat('#2b2e33', { roughness: 0.45, metalness: 0.6 });
+  const posterM = j => { const i = j % POSTERS.length; return envMat(`poster|${i}|${night}`, () => new THREE.MeshStandardMaterial({ map: posterTex(i), roughness: 0.35, emissive: '#ffffff', emissiveMap: posterTex(i), emissiveIntensity: night ? 0.9 : 0.12 })); };
   const streetSide = (x0, z0, x1, z1, nx, nz) => { // Bordsteinkante von (x0,z0) nach (x1,z1), Normale zeigt zur Straße
     const L = Math.hypot(x1 - x0, z1 - z0), ux = (x1 - x0) / L, uz = (z1 - z0) / L;
     for (let s = 6; s < L - 6; s += 2) {
@@ -3674,6 +3722,15 @@ function buildCity({ px0, px1, pz0, pz1, cx, cz, night, R, lights }) {
           if (Math.abs(nz) > 0.5) { const cz0 = z; if (nz > 0) { lightPool(env, hx, hz, r, hx - r, hx + r, cz0, cz0 + r, Y0 + 0.006); lightPool(env, hx, hz, r, hx - r, hx + r, cz0 - SW, cz0, 0.006); } else { lightPool(env, hx, hz, r, hx - r, hx + r, cz0 - r, cz0, Y0 + 0.006); lightPool(env, hx, hz, r, hx - r, hx + r, cz0, cz0 + SW, 0.006); } }
           else { const cx0 = x; if (nx > 0) { lightPool(env, hx, hz, r, cx0, cx0 + r, hz - r, hz + r, Y0 + 0.006); lightPool(env, hx, hz, r, cx0 - SW, cx0, hz - r, hz + r, 0.006); } else { lightPool(env, hx, hz, r, cx0 - r, cx0, hz - r, hz + r, Y0 + 0.006); lightPool(env, hx, hz, r, cx0, cx0 + SW, hz - r, hz + r, 0.006); } }
         }
+      } else if (k === 9 && dist < 55 && posterN < 10) { // Werbeplakat (beleuchteter Kasten, Plakat auf beiden Seiten, quer zum Gehweg)
+        const bx = x - nx * 1.7, bz = z - nz * 1.7, ang = Math.atan2(ux, uz);
+        batch.box(caseM, 1.36, 2.0, 0.16, bx, 1.3, bz, ang);
+        batch.box(caseM, 0.5, 0.3, 0.12, bx, 0.15, bz, ang);
+        for (const side of [1, -1]) {
+          const pg = new THREE.PlaneGeometry(1.18, 1.77); if (side < 0) pg.rotateY(Math.PI); pg.translate(0, 0, side * 0.085); pg.rotateY(ang); pg.translate(bx, 1.3, bz);
+          batch.add(posterM(posterN * 2 + (side < 0 ? 1 : 0)), pg);
+        }
+        posterN++;
       } else if (k === 6 || (k === 3 && R() < 0.4) || (k === 9 && R() < 0.4)) { // Straßenbaum
         const tx = x - nx * 1.0, tz = z - nz * 1.0, sc = 0.8 + R() * 0.5;
         batch.box(grateM, 1.1, 0.02, 1.1, tx, 0.01, tz);
@@ -5039,7 +5096,8 @@ function declutterLabels() {
   items.sort((a, b) => Math.abs(polyArea(b.r.points)) - Math.abs(polyArea(a.r.points)));
   const placed = [];
   for (const x of items) {
-    const b = x.box, hit = placed.some(p => b.left < p.right + 4 && p.left < b.right + 4 && b.top < p.bottom + 2 && p.top < b.bottom + 2);
+    // Hysterese: ein ausgeblendetes Label braucht etwas mehr Platz, bevor es wieder erscheint (sonst blinkt es beim Drehen an der Grenze)
+    const b = x.box, m = x.el.classList.contains('lbl-hidden') ? 12 : 4, hit = placed.some(p => b.left < p.right + m && p.left < b.right + m && b.top < p.bottom + m / 2 && p.top < b.bottom + m / 2);
     x.el.classList.toggle('lbl-hidden', hit); if (!hit) placed.push(b);
   }
 }
